@@ -112,7 +112,7 @@
       "rules": [
         {
           "name": "Keep 7y then Delete",
-          "durationDays": 2555,
+          "durationDays": 2557,
           "action": "Delete"
         }
       ],

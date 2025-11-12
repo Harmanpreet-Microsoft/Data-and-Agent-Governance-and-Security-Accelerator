@@ -83,7 +83,7 @@ foreach ($step in $selected) {
 
   Write-Host "==> $cmdDisplay" -ForegroundColor Green
   try {
-    & ".\${($step.File)}" @args
+    & ".\$($step.File)" @args
   } catch {
     Write-Host "ERROR in $($step.File): $($_.Exception.Message)" -ForegroundColor Red
     if (-not $ContinueOnError) { throw }

@@ -9,4 +9,4 @@ $p="/scan/datasources/$OneLakeName/scans/$ScanName?api-version=2024-05-01-previe
 $b=@{ properties=@{ scanRulesetType="System"; scanRulesetName="OneLake"; incrementalScanStartTime=(Get-Date).ToUniversalTime().ToString('o'); collection=@{ type='CollectionReference'; referenceName=$spec.purviewAccount } } }
 PvInvoke 'PUT' $p $b | Out-Null
 PvInvoke 'POST' "/scan/datasources/$OneLakeName/scans/$ScanName/run?api-version=2024-05-01-preview" $null | Out-Null
-Write-Host "Triggered OneLake scan $ScanName" -Foreground
+Write-Host "Triggered OneLake scan $ScanName" -ForegroundColor Green

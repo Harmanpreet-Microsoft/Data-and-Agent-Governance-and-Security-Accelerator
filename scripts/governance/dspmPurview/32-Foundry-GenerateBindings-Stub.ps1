@@ -1,4 +1,4 @@
-# Filename: 33-Compliance-Report.ps1
+# Filename: 32-Foundry-GenerateBindings-Stub.ps1
 param([string]$OutFile="./compliance_report.txt")
 Import-Module ExchangeOnlineManagement -ErrorAction Stop
 Connect-IPPSSession | Out-Null

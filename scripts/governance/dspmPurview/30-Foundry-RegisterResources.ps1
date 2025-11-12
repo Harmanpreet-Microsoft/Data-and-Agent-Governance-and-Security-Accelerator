@@ -4,7 +4,7 @@ $ErrorActionPreference='Stop'
 $spec = Get-Content $SpecPath -Raw | ConvertFrom-Json
 Import-Module Az.Accounts, Az.Resources -ErrorAction Stop
 Connect-AzAccount -Tenant $spec.tenantId | Out-Null; Select-AzSubscription -SubscriptionId $spec.subscriptionId | Out-Null
-if(!$spec.foundry.resources){ Write-Host "No foundry.resources"; exit 0 }
+if(-not $spec.foundry -or -not $spec.foundry.resources){ Write-Host "No foundry.resources"; exit 0 }
 foreach($r in $spec.foundry.resources){
   $res = Get-AzResource -ResourceId $r.resourceId -ErrorAction Stop
   Write-Host "Found resource: $($res.ResourceId)" -ForegroundColor Cyan

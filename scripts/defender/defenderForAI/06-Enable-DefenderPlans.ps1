@@ -1,3 +1,19 @@
+<#
+.SYNOPSIS
+  Enable Microsoft Defender for Cloud on Azure subscription.
+
+.DESCRIPTION
+  This script enables Microsoft Defender for Cloud, providing:
+  - Cloud Security Posture Management (CSPM)
+  - Threat protection capabilities
+  - Security recommendations
+  - Foundation for AI services protection
+
+.NOTES
+  Requires: Security Admin or Contributor role on Azure subscription
+#>
+
+
 # Filename: 06-Enable-DefenderPlans.ps1
 param([Parameter(Mandatory=$true)][string]$SpecPath)
 $ErrorActionPreference='Stop'
