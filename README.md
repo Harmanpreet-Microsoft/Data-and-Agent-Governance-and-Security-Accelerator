@@ -18,7 +18,7 @@ This accelerator knits together Microsoft 365, Microsoft Purview, Microsoft Defe
 
 ## Capabilities at a glance
 
-- **Data governance**: register storage, SQL, OneLake, and Fabric workspaces, trigger scans, and apply sensitivity labels, DLP, and retention policies that cover Azure AI Foundry usage.
+- **Purview Data Security Posture Management (DSPM) for AI**: register storage, SQL, OneLake, and Fabric workspaces, trigger Purview DSPM for AI scans, and apply sensitivity labels, DLP policies, and retention rules so AI workloads (Azure AI Foundry and ChatGPT Enterprise) inherit Microsoft Purview’s DSPM controls.
 - **Security posture**: assign Azure Policies, enable Defender for Cloud plans, and ship diagnostics to Log Analytics for continuous monitoring of AI endpoints.
 - **Compliance evidence**: subscribe to the Management Activity API, export audit logs, and push transcripts into storage or Fabric for downstream analytics.
 - **Application guardrails**: configure Content Safety blocklists, tag Azure resources with compliance metadata, and lay the groundwork for AI prompt filtering in ChatGPT Enterprise.
