@@ -2,11 +2,19 @@
 param([Parameter(Mandatory=$true)][string]$SpecPath)
 $ErrorActionPreference='Stop'
 $spec = Get-Content $SpecPath -Raw | ConvertFrom-Json
+$ensureContextPath = Join-Path $PSScriptRoot "..\..\common\Ensure-AzContext.ps1"
+. $ensureContextPath
 Import-Module Az.Accounts, Az.Resources -ErrorAction Stop
-Connect-AzAccount -Tenant $spec.tenantId | Out-Null; Select-AzSubscription -SubscriptionId $spec.subscriptionId | Out-Null
+Ensure-AzContext -TenantId $spec.tenantId -SubscriptionId $spec.subscriptionId
 if(-not $spec.foundry -or -not $spec.foundry.resources){ Write-Host "No foundry.resources"; exit 0 }
 foreach($r in $spec.foundry.resources){
   $res = Get-AzResource -ResourceId $r.resourceId -ErrorAction Stop
   Write-Host "Found resource: $($res.ResourceId)" -ForegroundColor Cyan
-  if($r.tags){ $merged = @{} + $res.Tags + $r.tags; Set-AzResource -ResourceId $res.ResourceId -Tag $merged -Force | Out-Null; Write-Host "Applied tags to $($res.Name)" -ForegroundColor Green }
+  if($r.tags){
+    $merged = @{}
+    if($res.Tags -is [Collections.IDictionary]){ $merged += $res.Tags }
+    if($r.tags -is [Collections.IDictionary]){ $merged += $r.tags }
+    Set-AzResource -ResourceId $res.ResourceId -Tag $merged -Force | Out-Null
+    Write-Host "Applied tags to $($res.Name)" -ForegroundColor Green
+  }
 }

@@ -69,6 +69,8 @@
   "labels": [
     {
       "name": "Confidential",
+      "displayName": "Confidential",
+      "tooltip": "Confidential data",
       "publishPolicyName": "Publish: Confidential",
       "encryptionEnabled": true,
       "publishScopes": {
@@ -113,6 +115,7 @@
       "name": "deny-public-access-cognitiveservices",
       "displayName": "Cognitive Services accounts should disable public network access",
       "scope": "resourceGroup",
+      "enabled": true,
       "parameters": {}
     }
   ],

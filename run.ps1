@@ -2,9 +2,95 @@ param(
   [string]   $SpecPath = "./spec.local.json",
   [string[]] $Tags     = @("dspm"),
   [switch]   $DryRun,
-  [switch]   $ContinueOnError
+  [switch]   $ContinueOnError,
+  [switch]   $ConnectM365,
+  [string]   $M365UserPrincipalName
 )
+if($M365UserPrincipalName){ $env:DAGA_M365_UPN = $M365UserPrincipalName } else { Remove-Item Env:DAGA_M365_UPN -ErrorAction SilentlyContinue }
+function Initialize-AutomationEnvironment {
+  param([bool]$RequireExchange)
 
+  try {
+    if ((Get-ExecutionPolicy -Scope Process) -ne "Bypass") {
+      Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force -ErrorAction Stop
+      Write-Host "Execution policy set to Bypass for this session." -ForegroundColor DarkGray
+    }
+  } catch {
+    Write-Warning "Unable to set process execution policy: $($_.Exception.Message)"
+  }
+
+  try {
+    $scriptRoot = Split-Path -Parent $PSCommandPath
+    $targets = Get-ChildItem -Path $scriptRoot -Filter *.ps1 -Recurse -ErrorAction SilentlyContinue
+    if ($targets) {
+      $targets | Unblock-File -ErrorAction SilentlyContinue
+      Write-Host "Validated PowerShell scripts are unblocked." -ForegroundColor DarkGray
+    }
+  } catch {
+    Write-Warning "Unable to unblock files automatically: $($_.Exception.Message)"
+  }
+
+  try {
+    $gallery = Get-PSRepository -Name PSGallery -ErrorAction Stop
+    if ($gallery.InstallationPolicy -ne "Trusted") {
+      Set-PSRepository -Name PSGallery -InstallationPolicy Trusted -ErrorAction Stop
+      Write-Host "Trusted PSGallery for module installs." -ForegroundColor DarkGray
+    }
+  } catch {
+    Write-Warning "Unable to update PSGallery trust settings: $($_.Exception.Message)"
+  }
+
+  if (Get-Module -Name ExchangeOnlineManagement -ErrorAction SilentlyContinue) {
+    Remove-Module -Name ExchangeOnlineManagement -Force -ErrorAction SilentlyContinue
+  }
+
+  $moduleSpecs = @(
+    @{ Name = "Az.Accounts";            MinimumVersion = "5.0.0" },
+    @{ Name = "Az.Resources";           MinimumVersion = $null },
+    @{ Name = "Az.Monitor";             MinimumVersion = $null },
+    @{ Name = "Az.OperationalInsights"; MinimumVersion = $null }
+  )
+  if ($RequireExchange) {
+    $moduleSpecs += @{ Name = "ExchangeOnlineManagement"; MinimumVersion = $null }
+  }
+
+  foreach ($module in $moduleSpecs) {
+    $installed = Get-Module -ListAvailable -Name $module.Name -ErrorAction SilentlyContinue | Sort-Object Version -Descending | Select-Object -First 1
+    $needsInstall = -not $installed
+    if (-not $needsInstall -and $module.MinimumVersion) {
+      try {
+        $needsInstall = ([version]$installed.Version -lt [version]$module.MinimumVersion)
+      } catch {
+        $needsInstall = $true
+      }
+    }
+    if ($needsInstall) {
+      $versionNote = if ($module.MinimumVersion) { " (>= $($module.MinimumVersion))" } else { "" }
+      Write-Host "Installing PowerShell module '$($module.Name)'$versionNote..." -ForegroundColor Cyan
+      if ($module.MinimumVersion) {
+        Install-Module -Name $module.Name -Scope CurrentUser -Force -AllowClobber -AcceptLicense -Confirm:$false -MinimumVersion $module.MinimumVersion
+      } else {
+        Install-Module -Name $module.Name -Scope CurrentUser -Force -AllowClobber -AcceptLicense -Confirm:$false
+      }
+    }
+  }
+
+  Import-Module Az.Accounts -ErrorAction Stop | Out-Null
+}
+
+Initialize-AutomationEnvironment -RequireExchange:$ConnectM365
+$planEntry = {
+  param([int]$Order,[string]$File,[string[]]$Tags,[bool]$NeedsSpec,[hashtable]$Parameters)
+  [pscustomobject]@{
+    Order      = $Order
+    File       = $File
+    Tags       = $Tags
+    NeedsSpec  = $NeedsSpec
+    Parameters = $Parameters
+  }
+}
+$exoCmds = @('Get-AdminAuditLogConfig','Set-AdminAuditLogConfig','Get-DlpCompliancePolicy','New-DlpCompliancePolicy','Get-DlpComplianceRule','New-DlpComplianceRule','Get-Label','New-Label','Get-LabelPolicy','New-LabelPolicy','New-RetentionCompliancePolicy','New-RetentionComplianceRule','Set-Label')
+$exoSessionEstablished = $false
 $ErrorActionPreference = "Stop"
 
 # --- Tag aliases (feature flags)
@@ -24,36 +110,32 @@ foreach ($t in $Tags) {
 
 # --- Plan: ordered steps with tags & spec requirements
 $plan = @(
-  @{Order=  5; File="scripts/governance/00-New-DspmSpec.ps1";                 Tags=@("ops");                      NeedsSpec=$false; Parameters=[ordered]@{ OutFile = $SpecPath }}
-  @{Order= 10; File="scripts/governance/01-Ensure-ResourceGroup.ps1";         Tags=@("foundation","dspm");        NeedsSpec=$true }
-  @{Order= 20; File="scripts/governance/dspmPurview/02-Ensure-PurviewAccount.ps1"; Tags=@("foundation","dspm");  NeedsSpec=$true }
-  @{Order= 30; File="scripts/exchangeOnline/10-Connect-Compliance.ps1";       Tags=@("m365");                       NeedsSpec=$false}
-  @{Order= 40; File="scripts/exchangeOnline/11-Enable-UnifiedAudit.ps1";      Tags=@("m365");                       NeedsSpec=$false}
-  @{Order= 50; File="scripts/governance/dspmPurview/12-Create-DlpPolicy.ps1"; Tags=@("m365");                       NeedsSpec=$true }
-  @{Order= 60; File="scripts/governance/dspmPurview/13-Create-SensitivityLabel.ps1"; Tags=@("m365");               NeedsSpec=$true }
-  @{Order= 70; File="scripts/governance/dspmPurview/14-Create-RetentionPolicy.ps1"; Tags=@("m365");               NeedsSpec=$true }
-  @{Order= 80; File="scripts/governance/dspmPurview/03-Register-DataSource.ps1";    Tags=@("scans","dspm","foundry");   NeedsSpec=$true }
-  @{Order= 90; File="scripts/governance/dspmPurview/04-Run-Scan.ps1";               Tags=@("scans","dspm","foundry");   NeedsSpec=$true }
-  @{Order=100; File="scripts/governance/dspmPurview/20-Subscribe-ManagementActivity.ps1"; Tags=@("audit","dspm"); NeedsSpec=$true }
-  @{Order=110; File="scripts/governance/dspmPurview/21-Export-Audit.ps1";     Tags=@("audit","dspm");             NeedsSpec=$true }
-  @{Order=120; File="scripts/governance/dspmPurview/05-Assign-AzurePolicies.ps1";   Tags=@("policies","dspm","defender");NeedsSpec=$true}
-  @{Order=130; File="scripts/defender/defenderForAI/06-Enable-DefenderPlans.ps1";   Tags=@("defender");                 NeedsSpec=$true }
-  @{Order=140; File="scripts/defender/defenderForAI/07-Enable-Diagnostics.ps1";     Tags=@("defender","diagnostics","foundry"); NeedsSpec=$true }
-  @{Order=150; File="scripts/governance/dspmPurview/25-Tag-ResourcesFromSpec.ps1";  Tags=@("tags","foundry","dspm");    NeedsSpec=$true }
-  @{Order=160; File="scripts/governance/dspmPurview/26-Register-OneLake.ps1";       Tags=@("scans","foundry","dspm");   NeedsSpec=$true }
-  @{Order=170; File="scripts/governance/dspmPurview/27-Register-FabricWorkspace.ps1";Tags=@("scans","foundry","dspm");  NeedsSpec=$true }
-  @{Order=180; File="scripts/governance/dspmPurview/28-Trigger-OneLakeScan.ps1";    Tags=@("scans","foundry","dspm");   NeedsSpec=$true }
-  @{Order=190; File="scripts/governance/dspmPurview/29-Trigger-FabricWorkspaceScan.ps1"; Tags=@("scans","foundry","dspm"); NeedsSpec=$true }
-  @{Order=200; File="scripts/governance/dspmPurview/30-Foundry-RegisterResources.ps1"; Tags=@("foundry","ops");         NeedsSpec=$true }
-  @{Order=210; File="scripts/governance/dspmPurview/31-Foundry-ConfigureContentSafety.ps1"; Tags=@("foundry","contentsafety","defender"); NeedsSpec=$true }
-  @{Order=220; File="scripts/governance/dspmPurview/17-Export-ComplianceInventory.ps1"; Tags=@("ops","dspm");           NeedsSpec=$false}
-  @{Order=230; File="scripts/governance/dspmPurview/34-Validate-Posture.ps1";       Tags=@("ops","dspm","defender");    NeedsSpec=$true }
-  # Stubs (optional steps)
-  @{Order=240; File="scripts/governance/dspmPurview/15-Create-SensitiveInfoType-Stub.ps1";    Tags=@("policies","dspm"); NeedsSpec=$false}
-  @{Order=250; File="scripts/governance/dspmPurview/16-Create-TrainableClassifier-Stub.ps1";  Tags=@("policies","dspm"); NeedsSpec=$false}
-  @{Order=260; File="scripts/governance/dspmPurview/22-Ship-AuditToStorage.ps1";              Tags=@("audit","ops");     NeedsSpec=$false}
-  @{Order=270; File="scripts/governance/dspmPurview/23-Ship-AuditToFabricLakehouse-Stub.ps1"; Tags=@("audit","foundry"); NeedsSpec=$false}
-  @{Order=280; File="scripts/governance/dspmPurview/24-Create-BudgetAlert-Stub.ps1";          Tags=@("ops");             NeedsSpec=$false}
+  & $planEntry -Order  5 -File "scripts/governance/00-New-DspmSpec.ps1" -Tags @("ops") -NeedsSpec:$false -Parameters ([ordered]@{ OutFile = $SpecPath })
+  & $planEntry -Order 10 -File "scripts/governance/01-Ensure-ResourceGroup.ps1" -Tags @("foundation","dspm") -NeedsSpec:$true -Parameters $null
+  & $planEntry -Order 20 -File "scripts/governance/dspmPurview/02-Ensure-PurviewAccount.ps1" -Tags @("foundation","dspm") -NeedsSpec:$true -Parameters $null
+  & $planEntry -Order 30 -File "scripts/exchangeOnline/10-Connect-Compliance.ps1" -Tags @("m365") -NeedsSpec:$false -Parameters $null
+  & $planEntry -Order 40 -File "scripts/exchangeOnline/11-Enable-UnifiedAudit.ps1" -Tags @("m365") -NeedsSpec:$false -Parameters $null
+  & $planEntry -Order 50 -File "scripts/governance/dspmPurview/12-Create-DlpPolicy.ps1" -Tags @("m365") -NeedsSpec:$true -Parameters $null
+  & $planEntry -Order 60 -File "scripts/governance/dspmPurview/13-Create-SensitivityLabel.ps1" -Tags @("m365") -NeedsSpec:$true -Parameters $null
+  & $planEntry -Order 70 -File "scripts/governance/dspmPurview/14-Create-RetentionPolicy.ps1" -Tags @("m365") -NeedsSpec:$true -Parameters $null
+  & $planEntry -Order 80 -File "scripts/governance/dspmPurview/03-Register-DataSource.ps1" -Tags @("scans","dspm","foundry") -NeedsSpec:$true -Parameters $null
+  & $planEntry -Order 90 -File "scripts/governance/dspmPurview/04-Run-Scan.ps1" -Tags @("scans","dspm","foundry") -NeedsSpec:$true -Parameters $null
+  & $planEntry -Order 100 -File "scripts/governance/dspmPurview/20-Subscribe-ManagementActivity.ps1" -Tags @("audit","dspm") -NeedsSpec:$true -Parameters $null
+  & $planEntry -Order 110 -File "scripts/governance/dspmPurview/21-Export-Audit.ps1" -Tags @("audit","dspm") -NeedsSpec:$true -Parameters $null
+  & $planEntry -Order 120 -File "scripts/governance/dspmPurview/05-Assign-AzurePolicies.ps1" -Tags @("policies","dspm","defender") -NeedsSpec:$true -Parameters $null
+  & $planEntry -Order 130 -File "scripts/defender/defenderForAI/06-Enable-DefenderPlans.ps1" -Tags @("defender") -NeedsSpec:$true -Parameters $null
+  & $planEntry -Order 140 -File "scripts/defender/defenderForAI/07-Enable-Diagnostics.ps1" -Tags @("defender","diagnostics","foundry") -NeedsSpec:$true -Parameters $null
+  & $planEntry -Order 150 -File "scripts/governance/dspmPurview/25-Tag-ResourcesFromSpec.ps1" -Tags @("tags","foundry","dspm") -NeedsSpec:$true -Parameters $null
+  # Fabric/OneLake steps temporarily disabled until workspace exists
+  # & $planEntry -Order 160 -File "scripts/governance/dspmPurview/26-Register-OneLake.ps1" -Tags @("scans","foundry","dspm") -NeedsSpec:$true -Parameters $null
+  # & $planEntry -Order 170 -File "scripts/governance/dspmPurview/27-Register-FabricWorkspace.ps1" -Tags @("scans","foundry","dspm") -NeedsSpec:$true -Parameters $null
+  # & $planEntry -Order 180 -File "scripts/governance/dspmPurview/28-Trigger-OneLakeScan.ps1" -Tags @("scans","foundry","dspm") -NeedsSpec:$true -Parameters $null
+  # & $planEntry -Order 190 -File "scripts/governance/dspmPurview/29-Trigger-FabricWorkspaceScan.ps1" -Tags @("scans","foundry","dspm") -NeedsSpec:$true -Parameters $null
+  & $planEntry -Order 200 -File "scripts/governance/dspmPurview/30-Foundry-RegisterResources.ps1" -Tags @("foundry","ops") -NeedsSpec:$true -Parameters $null
+  & $planEntry -Order 210 -File "scripts/governance/dspmPurview/31-Foundry-ConfigureContentSafety.ps1" -Tags @("foundry","contentsafety","defender") -NeedsSpec:$true -Parameters $null
+  & $planEntry -Order 220 -File "scripts/governance/dspmPurview/17-Export-ComplianceInventory.ps1" -Tags @("ops") -NeedsSpec:$false -Parameters $null
+  & $planEntry -Order 230 -File "scripts/governance/dspmPurview/34-Validate-Posture.ps1" -Tags @("ops","dspm","defender","m365") -NeedsSpec:$true -Parameters $null
+  & $planEntry -Order 280 -File "scripts/governance/dspmPurview/24-Create-BudgetAlert-Stub.ps1" -Tags @("ops") -NeedsSpec:$false -Parameters $null
 )
 
 # Filter by tags
@@ -84,6 +166,23 @@ foreach ($step in $selected) {
   if ($step.Parameters) {
     foreach ($entry in $step.Parameters.GetEnumerator()) {
       $stepParams[$entry.Key] = $entry.Value
+    }
+  }
+
+  $requiresM365 = $step.Tags -contains "m365"
+  if ($requiresM365) {
+    if (-not $ConnectM365) {
+      throw "Step '$($step.File)' requires Microsoft 365 connectivity. Re-run with -ConnectM365 -M365UserPrincipalName <UPN>."
+    }
+    if (-not $M365UserPrincipalName) {
+      throw "-ConnectM365 requires -M365UserPrincipalName to know which account to sign in with."
+    }
+    if (-not $exoSessionEstablished) {
+      Write-Host "Connecting to Exchange Online for compliance cmdlets..." -ForegroundColor Cyan
+      Connect-ExchangeOnline -UserPrincipalName $M365UserPrincipalName -ShowBanner:$false -CommandName $exoCmds | Out-Null
+      Write-Host "Connecting to Security & Compliance PowerShell..." -ForegroundColor Cyan
+      Connect-IPPSSession -UserPrincipalName $M365UserPrincipalName -ShowBanner:$false | Out-Null
+      $exoSessionEstablished = $true
     }
   }
 

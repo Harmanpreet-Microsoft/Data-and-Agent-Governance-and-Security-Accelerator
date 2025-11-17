@@ -48,6 +48,8 @@ $tmpl = @'
   "labels": [
     {
       "name": "Confidential",
+      "displayName": "Confidential",
+      "tooltip": "Confidential data",
       "publishPolicyName": "Publish: Confidential (All Users)",
       "encryptionEnabled": true,
       "publishScopes": { "Exchange": "All", "SharePoint": "All", "OneDrive": "All" }

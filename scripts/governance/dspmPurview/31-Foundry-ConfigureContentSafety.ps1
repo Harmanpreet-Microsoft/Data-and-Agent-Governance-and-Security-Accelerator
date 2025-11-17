@@ -3,21 +3,39 @@ param([Parameter(Mandatory=$true)][string]$SpecPath)
 $ErrorActionPreference='Stop'
 $spec = Get-Content $SpecPath -Raw | ConvertFrom-Json
 if(!$spec.foundry.contentSafety){ Write-Host "No foundry.contentSafety"; exit 0 }
+$ensureContextPath = Join-Path $PSScriptRoot "..\..\common\Ensure-AzContext.ps1"
+. $ensureContextPath
 Import-Module Az.Accounts, Az.KeyVault, Az.Resources -ErrorAction Stop
-Connect-AzAccount -Tenant $spec.tenantId | Out-Null; Select-AzSubscription -SubscriptionId $spec.subscriptionId | Out-Null
+Ensure-AzContext -TenantId $spec.tenantId -SubscriptionId $spec.subscriptionId
 $cs = $spec.foundry.contentSafety
-$kvRes = Get-AzResource -ResourceId $cs.apiKeySecretRef.keyVaultResourceId -ErrorAction Stop
-$kvName = ($kvRes.ResourceId -split "/")[-1]
-$apiKey = (Get-AzKeyVaultSecret -VaultName $kvName -Name $cs.apiKeySecretRef.secretName -ErrorAction Stop).SecretValueText
+if([string]::IsNullOrWhiteSpace($cs.endpoint)){ Write-Host "foundry.contentSafety.endpoint not provided" -ForegroundColor Yellow; exit 0 }
 $base = $cs.endpoint.TrimEnd('/')
+$headers = @{}
+$hasKey = $cs.apiKeySecretRef -and $cs.apiKeySecretRef.keyVaultResourceId -and $cs.apiKeySecretRef.secretName
+if($hasKey){
+  $kvRes = Get-AzResource -ResourceId $cs.apiKeySecretRef.keyVaultResourceId -ErrorAction Stop
+  $kvName = ($kvRes.ResourceId -split "/")[-1]
+  $apiKey = (Get-AzKeyVaultSecret -VaultName $kvName -Name $cs.apiKeySecretRef.secretName -ErrorAction Stop).SecretValueText
+  $headers["Ocp-Apim-Subscription-Key"] = $apiKey
+  Write-Host "Using Content Safety API key from Key Vault '$kvName'" -ForegroundColor Cyan
+}
+else{
+  try{
+    $token = (Get-AzAccessToken -ResourceUrl "https://cognitiveservices.azure.com" -TenantId $spec.tenantId).Token
+    $headers["Authorization"] = "Bearer $token"
+    Write-Host "Using Entra ID access token for Content Safety (disableLocalAuth=true scenario)" -ForegroundColor Cyan
+  }catch{
+    throw "Unable to obtain Content Safety access token. Provide Key Vault secret or ensure identity has permissions. $_"
+  }
+}
 if($cs.textBlocklists){
   foreach($bl in $cs.textBlocklists){
     $uri = "$base/contentsafety/text/blocklists/$($bl.name)?api-version=2024-02-15-preview"
-    try{ Invoke-RestMethod -Method PUT -Uri $uri -Headers @{ "Ocp-Apim-Subscription-Key"=$apiKey } -ContentType "application/json" -Body (@{}|ConvertTo-Json) | Out-Null; Write-Host "Ensured blocklist: $($bl.name)" -ForegroundColor Green }catch{ Write-Host "Blocklist ensure may exist: $($_.Exception.Message)" -ForegroundColor DarkGray }
+    try{ Invoke-RestMethod -Method PUT -Uri $uri -Headers $headers -ContentType "application/json" -Body (@{}|ConvertTo-Json) | Out-Null; Write-Host "Ensured blocklist: $($bl.name)" -ForegroundColor Green }catch{ Write-Host "Blocklist ensure may exist: $($_.Exception.Message)" -ForegroundColor DarkGray }
     if($bl.items -and $bl.items.Count -gt 0){
       $itemsUri = "$base/contentsafety/text/blocklists/$($bl.name)/:blockItems?api-version=2024-02-15-preview"
       $body = @{ blockItems=@() }; foreach($itm in $bl.items){ $body.blockItems += @{ description=$itm; text=$itm } }
-      Invoke-RestMethod -Method POST -Uri $itemsUri -Headers @{ "Ocp-Apim-Subscription-Key"=$apiKey } -ContentType "application/json" -Body ($body|ConvertTo-Json -Depth 10) | Out-Null
+      Invoke-RestMethod -Method POST -Uri $itemsUri -Headers $headers -ContentType "application/json" -Body ($body|ConvertTo-Json -Depth 10) | Out-Null
       Write-Host "Added $($bl.items.Count) items to '$($bl.name)'" -ForegroundColor Green
     }
   }

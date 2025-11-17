@@ -72,6 +72,10 @@ This accelerator knits together Microsoft 365, Microsoft Purview, Microsoft Defe
 
     ```
 
+  **Manual Purview action (until API support ships):** after `30-Foundry-RegisterResources.ps1` and `31-Foundry-ConfigureContentSafety.ps1` finish, sign into the Purview portal and navigate to **Data Security Posture > Recommendations > Secure interactions for enterprise AI apps** (a.k.a. **Capture interactions for enterprise AI apps**). Enable the recommendation for each Azure AI Foundry account/project that will publish chats. The "Enable Data Security for AI Interactions" switch cannot be set via API yet, so this manual step is required to collect Foundry chat interactions.
+
+  **Content Safety script behavior:** if `foundry.contentSafety` is missing, the script logs "No foundry.contentSafety" and skips configuration so the rest of the tag run continues. When an endpoint is present but the Key Vault secret info is omitted or local auth is disabled, the script automatically requests an Entra ID access token for `https://cognitiveservices.azure.com` (works with system-assigned managed identities) and uses it to call the Content Safety REST APIs. Supplying a Key Vault secret still works when you prefer key-based auth. In either mode, every Foundry project listed under `foundry.resources` inherits the blocklists/items defined in the spec.
+
 5. **Review dashboards** in Purview and Defender, then export evidence with `17-Export-ComplianceInventory.ps1`, `21-Export-Audit.ps1`, and `34-Validate-Posture.ps1`.
 
 ## Running inside GitHub Codespaces
@@ -81,12 +85,26 @@ This accelerator knits together Microsoft 365, Microsoft Purview, Microsoft Defe
 - **Step 2 – Codespaces container:** From the authenticated Codespaces PowerShell session, run `./run.ps1 -Tags dspm defender foundry -SpecPath ./spec.local.json`. These tags cover Azure resource provisioning, Defender plans, diagnostics, and Purview DSPM tasks that only rely on Az modules.
 - **Optional automation:** If you configure certificate-based auth for Exchange Online, you can export the app settings into the container and run `-Tags m365` there; otherwise treat it as a prerequisite before running remaining tags in Codespaces.
 
+### Tag reference
+| Tag | What it runs / why it exists |
+| --- | --- |
+| `foundation` | Baseline Purview/DSPM bootstrap: `01-Ensure-ResourceGroup.ps1`, `02-Ensure-PurviewAccount.ps1`, data-source registration + first scans. Delivers the landing zone Purview needs before policies or scans proceed. |
+| `m365` | Exchange Online / Compliance Center steps that require interactive auth: connect session, enable unified audit, create DLP policies, sensitivity labels, retention policies. Run from a desktop with MFA access. |
+| `dspm` | Broader Purview governance tasks beyond the bootstrap: scan registration, audit subscriptions/exports (`20-21`), Azure policy assignments, tagging, posture validation. Combine with `foundation` for the full Purview story. |
+| `defender` | Defender for AI enablement scripts (`06-Enable-DefenderPlans.ps1`, `07-Enable-Diagnostics.ps1`) plus content-safety wiring. Requires the AI subscription/resource group fields in the spec. |
+| `foundry` | Azure AI Foundry integration: resource registration, tagging, diagnostics, content safety, OneLake/Fabric registration (when enabled). Works off `aiFoundry` and `foundry.resources` blocks in the spec. |
+| `scans`, `audit`, `policies`, `diagnostics`, `ops`, `tags`, `contentsafety` | Finer-grained switches used internally by the plan. You usually won’t call them directly unless you want to rerun a single slice (e.g., `-Tags audit` to replay the audit export scripts). |
+| `all` | Convenience alias that expands to every tag listed above (runs everything end-to-end). |
+
+Use whichever combination suits your workflow (for example, `-Tags m365` from a workstation, then `-Tags dpsm,defender,foundry` from Cloud Shell). Documenting the tags keeps the intent clear until we refactor or rename them.
+
 ## Spec management
 
 - The repo tracks a sanitized contract in `spec.dspm.template.json`. Update it when the schema evolves so customers always have an authoritative sample.
 - Create your working copy via `Copy-Item ./spec.dspm.template.json ./spec.local.json` (or the equivalent). This file is listed in `.gitignore` so it stays on your machine.
 - Pass `-SpecPath ./spec.local.json` (or any other filename you choose) when running modules. `run.ps1` defaults to `./spec.local.json` and prints a friendly error if the file is missing.
 - For multiple environments, create additional local files such as `spec.dev.json` and point `run.ps1 -SpecPath` to the one you need. Keep secrets in Key Vault rather than the spec.
+- Need to postpone an Azure Policy assignment? Set `"enabled": false` on that entry in `azurePolicies`. The assignment script logs the skip and leaves the declaration in place for later.
 
 ---
 

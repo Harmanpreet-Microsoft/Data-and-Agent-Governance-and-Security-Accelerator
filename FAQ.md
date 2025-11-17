@@ -18,6 +18,17 @@ Yes—but rerunning the PowerShell will only detect that the portal toggle is of
 ## Do the scripts create DLP policies automatically?
 Yes. `scripts/governance/dspmPurview/12-Create-DlpPolicy.ps1` uses Exchange Online PowerShell (similar to `New-DlpComplianceRule`) and only requires Purview Audit to be enabled plus Compliance Administrator-level permissions.
 
+## Why are there two `logAnalyticsWorkspaceId` fields in the spec?
+- The top-level `logAnalyticsWorkspaceId` (near the subscription/resourceGroup fields) is the “general purpose” workspace. Purview scans, tagging diagnostics, and other scripts wire telemetry here if they need a workspace and you don’t override it elsewhere.
+- `defenderForAI.logAnalyticsWorkspaceId` lives under the `defenderForAI` block because the Defender diagnostics script (`07-Enable-Diagnostics.ps1`) can push logs to a different workspace than the rest of the automation. Leave it blank to fall back to the top-level ID, or supply a dedicated Defender workspace if your security team requires isolation.
+- Both fields exist so you can either reuse a single workspace or split Defender telemetry from the broader operations log stream without editing the scripts.
+
+## Why does the spec have both `aiFoundry` and `foundry.resources` (and two Content Safety blocks)?
+- `aiFoundry` is the single “anchor” Azure AI Foundry project that scripts such as `30-Foundry-RegisterResources.ps1` expect. It provides one canonical project name/resourceId even if you only manage a single workspace.
+- `foundry.resources` is an array so you can tag/monitor multiple Cognitive Services or AI Foundry workloads. Each entry feeds `25-Tag-ResourcesFromSpec.ps1`, `31-Foundry-ConfigureContentSafety.ps1`, and similar automation. If you only have one project, you’ll see the same resource repeated just so the array isn’t empty.
+- `foundry.contentSafety` contains the Content Safety configuration that should be applied to those Foundry-linked resources (endpoint, Key Vault secret, blocklists, severity threshold).
+- The top-level `contentSafety` section is for standalone Content Safety deployments outside Foundry—for example, when you attach Content Safety to Azure OpenAI directly. Different scripts reference each block, so both remain even if some fields are empty.
+
 ## Can I run everything from azd, GitHub Actions, or another automation platform?
 - **azd hooks / GitHub Actions / Azure Automation** work for Azure resource tasks (Purview account, Defender plans, policies). Use a service principal with `Contributor` or `Security Admin` rights.
 - **Exchange Online & Compliance Center** tasks (audit enablement, DLP creation) still require interactive or certificate-based authentication tied to a high-privilege M365 role. They usually run from a workstation or secure automation account capable of satisfying MFA.

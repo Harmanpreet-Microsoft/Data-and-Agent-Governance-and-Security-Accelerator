@@ -1,8 +1,10 @@
 # Filename: 04-Run-Scan.ps1
 param([Parameter(Mandatory=$true)][string]$SpecPath)
 $spec = Get-Content $SpecPath -Raw | ConvertFrom-Json
+$ensureContextPath = Join-Path $PSScriptRoot "..\..\common\Ensure-AzContext.ps1"
+. $ensureContextPath
 Import-Module Az.Accounts -ErrorAction Stop
-Connect-AzAccount -Tenant $spec.tenantId | Out-Null
+Ensure-AzContext -TenantId $spec.tenantId -SubscriptionId $spec.subscriptionId
 function Get-PvToken { (Get-AzAccessToken -ResourceUrl "https://purview.azure.net").Token }
 function PvInvoke([string]$m,[string]$p,[object]$b) {
   $u = "https://$($spec.purviewAccount).purview.azure.com$p"
