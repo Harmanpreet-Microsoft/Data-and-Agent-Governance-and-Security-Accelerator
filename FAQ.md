@@ -69,11 +69,15 @@ Confirming what’s happening: the only part of the accelerator that “register
 	```powershell
 	Install-Module Az -Scope CurrentUser -Repository PSGallery -Force -AllowClobber
 	```
-2. **Authenticate to Azure** before invoking the orchestrator. In containerized or SSH sessions without a GUI, use device code auth:
+2. **Authenticate to Azure** before invoking the orchestrator. Use a standard interactive login from a workstation with a browser:
 	```powershell
-	Connect-AzAccount -Tenant '<tenant-guid>' -UseDeviceAuthentication
+	Connect-AzAccount -Tenant '<tenant-guid>' -Subscription '<subscription-guid>'
 	```
-	Follow the browser prompt to complete sign-in. If you prefer unattended execution, use a service principal instead (`Connect-AzAccount -ServicePrincipal ...`).
+	If you need headless or automated execution, use a service principal or managed identity rather than device-code auth:
+	```powershell
+	Connect-AzAccount -ServicePrincipal -Tenant '<tenant-guid>' -ApplicationId '<appId>' -Credential (Get-Credential)
+	```
+	Store credentials securely (Key Vault, automation account variables) and avoid device-code flows because they are disabled in this accelerator.
 3. **Run the orchestrator** from the repo root once the session is authenticated:
 	```powershell
 	./run.ps1 -Tags dspm defender -SpecPath ./spec.local.json   # from bash/zsh use: pwsh ./run.ps1 -Tags ...

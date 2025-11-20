@@ -36,9 +36,13 @@ function Ensure-AzContext {
     }
 
     if(-not $needsFallback){ throw }
-    Write-Warning "Default Azure login failed due to WAM; retrying with device authentication."
-    $connectParams['UseDeviceAuthentication'] = $true
-    Connect-AzAccount @connectParams | Out-Null
+    $guidance = @()
+    $guidance += "Default Azure login failed due to WAM (Workplace Account Manager) limitations."
+    $guidance += "Device-code authentication is disabled for this accelerator."
+    $guidance += "Run Connect-AzAccount -Tenant $TenantId -Subscription $SubscriptionId from an interactive shell with a browser,"
+    $guidance += "or supply service principal credentials (Connect-AzAccount -ServicePrincipal ...)."
+    $guidance += "Retry the script after establishing a valid context."
+    throw ($guidance -join ' ')
   }
   Select-AzSubscription -SubscriptionId $SubscriptionId | Out-Null
 }
