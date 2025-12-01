@@ -2,7 +2,7 @@
 
 Use this supplement when briefing sellers, technical specialists, or customer champions. Each section pairs the **what** and **why** for every automation step so teams can frame the value in plain language.
 
-### Latest Microsoft Learn signals (Nov 2025)
+### Latest Microsoft Learn signals (as of late 2025)
 - [Use Microsoft Purview to manage data security & compliance for Microsoft Foundry](https://learn.microsoft.com/en-us/purview/ai-azure-foundry) now calls out the **Secure data in Azure AI apps and agents** recommendation plus the **DSPM for AI – Capture interactions for enterprise AI apps** one-click policy. Reference these names whenever you describe the Know Your Data (Secure Interactions) automation.
 - The same article reiterates that prompts/responses flow through Unified Audit and land in the user’s mailbox, and that capturing those events requires a [collection policy](https://learn.microsoft.com/en-us/purview/collection-policies-solution-overview). Step 3 below maps directly to that guidance.
 - Defender for Cloud onboarding guidance now lists “Enable data security for Azure AI with Microsoft Purview” as the prerequisite switch. Tie Steps 5–8 back to this wording so customers can cross-check in the Azure portal.
