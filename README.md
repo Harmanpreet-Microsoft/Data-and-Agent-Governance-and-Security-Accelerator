@@ -83,6 +83,7 @@ Before DSPM can provide insights and risk analytics, you must opt in to analytic
   ./run.ps1 -Tags m365,dspm,defender,foundry -SpecPath ./spec.local.json
   # or, from bash/zsh: pwsh ./run.ps1 -Tags m365,dspm,defender,foundry -SpecPath ./spec.local.json
   ```
+- Expect **multiple authentication prompts** during a full run. Each tag connects to different control planes (Exchange Online, Azure, Defender, Content Safety), so distinct operator accounts or privileged groups may need to approve access. This is intentional so governance stakeholders remain in the loop.
 - Azure RBAC permissions: **Contributor** on the subscription that hosts Purview, AI Foundry, and Defender resources.
 
 ---
