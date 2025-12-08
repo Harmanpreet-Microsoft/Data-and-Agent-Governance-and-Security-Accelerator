@@ -12,6 +12,36 @@ Light up Microsoft Purview Data Security Posture Management (DSPM) for AI to saf
 
 ---
 
+## Getting Started - Choose Your Path
+
+**🆕 New to this accelerator?**  
+→ Start with the [Deployment Guide](./docs/DeploymentGuide.md) for comprehensive step-by-step instructions
+
+**🔄 Already familiar with the solution?**  
+→ Use [Quick Deploy](#quick-deploy) below for reference commands
+
+**🎯 Want to secure Azure AI Foundry only?**  
+→ Jump to [Foundry-Only Configuration](#foundry-only-configuration) for minimal setup
+
+**📊 Need to understand which tags to run?**  
+→ See [Common Deployment Scenarios](#common-deployment-scenarios) for scenario-based guidance
+
+### First Time Setup Checklist
+
+Follow these steps in order for your first successful run:
+
+- [ ] **1. Install tooling** - Azure CLI 2.58+, azd 1.9+, PowerShell 7.x, Az modules
+- [ ] **2. Gather resource info** - Tenant ID, Subscription ID, Purview account name, AI Foundry project details
+- [ ] **3. Clone repo** - `git clone https://github.com/microsoft/Data-Agent-Governance-and-Security-Accelerator.git`
+- [ ] **4. Create spec file** - `Copy-Item ./spec.dspm.template.json ./spec.local.json`
+- [ ] **5. Configure spec** - Replace placeholder values with your actual resource IDs and settings
+- [ ] **6. Sign in** - Run `az login`, `azd auth login`, `Connect-AzAccount`, `Set-AzContext` in same terminal
+- [ ] **7. Run automation** - Execute `azd up` or `./run.ps1 -Tags <your-tags> -SpecPath ./spec.local.json`
+- [ ] **8. Complete manual steps** - Enable Purview DSPM and Defender for AI toggles in portals
+- [ ] **9. Verify** - Check dashboards in Purview and Defender for Cloud to confirm configuration
+
+---
+
 ## Solution overview
 This accelerator orchestrates Azure and Microsoft 365 governance artifacts through PowerShell and azd hooks:
 
@@ -21,8 +51,26 @@ This accelerator orchestrates Azure and Microsoft 365 governance artifacts throu
 - Provides repeatable CI/Desktop experiences through spec-controlled tags and azd post-provision hooks.
 
 ### Solution architecture
-| ![Data Agent governance architecture](./docs/doc-images/architectureDAGSA.png) |
-| --- |
+
+![Data Agent governance architecture](./docs/doc-images/architectureDAGSA.png)
+
+### What is DSPM for AI?
+
+**Microsoft Purview Data Security Posture Management (DSPM) for AI** is a set of capabilities that help organizations:
+
+- **Discover** where AI interactions occur across M365 Copilot, Azure AI Foundry, and third-party AI apps
+- **Classify** sensitive data flowing through AI prompts and responses using sensitivity labels
+- **Protect** data with DLP policies that prevent sensitive information from being shared with AI systems
+- **Monitor** AI interactions through audit logs and compliance dashboards
+- **Govern** retention and eDiscovery for AI-generated content
+
+**Microsoft Defender for AI** complements DSPM by providing:
+
+- **Threat detection** for AI-specific attacks (prompt injection, jailbreaks, data exfiltration)
+- **Posture hardening** recommendations for AI resources
+- **Attack path analysis** showing how AI components connect to sensitive data
+
+This accelerator automates the configuration of both services so you don't have to manually toggle settings across multiple portals.
 
 ### How to customize
 - [Author and extend the spec contract](./spec.dspm.template.json) for each tenant/subscription.
@@ -31,6 +79,7 @@ This accelerator orchestrates Azure and Microsoft 365 governance artifacts throu
 - Extend stub scripts (for example `15-Create-SensitiveInfoType-Stub.ps1`) with organization-specific controls.
 
 ### Additional resources
+- [Architecture Overview](./docs/ArchitectureOverview.md) - Technical architecture and class diagram
 - [Deployment Guide](./docs/DeploymentGuide.md)
 - [Troubleshooting Guide](./docs/TroubleshootingGuide.md)
 - [Spec-driven governance narrative](./docs/dspm-sales-narrative.md)
@@ -55,18 +104,149 @@ This accelerator orchestrates Azure and Microsoft 365 governance artifacts throu
 ## Quick deploy
 > **Azure Developer CLI requirement:** Install azd **1.9.0 or later** and Azure CLI **2.58.0 or later** before deploying.
 
-1. Run `az login`, `azd auth login`, `Connect-AzAccount`, and `Set-AzContext` so CLI + PowerShell contexts match your spec.
-2. Copy `spec.dspm.template.json` to `spec.local.json`, populate IDs, Purview settings, Foundry resources, and Defender plans.
-3. Optional: adjust `infra/main.bicepparam` (tags, spec path, Microsoft 365 auth options).
-4. Execute `azd up` to trigger the Bicep no-op and post-provision hook, or run `pwsh ./run.ps1 -Tags foundation,dspm,defender,foundry -SpecPath ./spec.local.json` directly.
-5. From a desktop, run `./run.ps1 -Tags m365 -ConnectM365 -M365UserPrincipalName <upn>` to publish Secure Interactions, DLP, labels, and retention policies.
+### Execution paths (choose one)
 
-| [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/microsoft/Data-Agent-Governance-and-Security-Accelerator) | [![Open in Dev Containers](https://img.shields.io/static/v1?style=for-the-badge&label=Dev%20Containers&message=Open&color=blue&logo=visualstudiocode)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/microsoft/Data-Agent-Governance-and-Security-Accelerator) | [![Open in Visual Studio Code Web](https://img.shields.io/static/v1?style=for-the-badge&label=Visual%20Studio%20Code%20(Web)&message=Open&color=blue&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/azure/?vscode-azure-exp=foundry&agentPayload=eyJiYXNlVXJsIjogImh0dHBzOi8vZ2l0aHViLmNvbS9taWNyb3NvZnQvRGF0YS1BZ2VudC1Hb3Zlcm5hbmNlLWFuZC1TZWN1cml0eS1BY2NlbGVyYXRvciIsICJpbmRleFVybCI6ICIvcmVmczo6aGVhZHMvbWFpbi9pbmZyYS92c2NvZGVfd2ViIiwgImNsYWltcyI6IHsid29ya2Zsb3ciOiAiY2xvbmUifX0=) |
+**Option A - azd orchestrated** (recommended for CI/Codespaces):
+```powershell
+azd up  # Triggers hooks/postprovision.ps1 → run.ps1 automatically
+```
+
+**Option B - Direct run.ps1** (recommended for desktop/manual runs):
+```powershell
+pwsh ./run.ps1 -Tags foundation,dspm,defender,foundry -SpecPath ./spec.local.json
+```
+
+> Both execute the same automation. `azd up` adds token import logic for container environments where Azure CLI context needs to be propagated to Az PowerShell modules.
+
+### Steps
+
+1. **Sign in to Azure** - Run these commands in the same terminal you'll use for deployment:
+   ```powershell
+   az login
+   azd auth login
+   Connect-AzAccount -Tenant <tenantId> -Subscription <subscriptionId>
+   Set-AzContext -Subscription <subscriptionId>
+   Get-AzContext  # Verify tenant/subscription match your spec
+   ```
+
+2. **Prepare the spec** - Copy `spec.dspm.template.json` to `spec.local.json` and populate required fields:
+   
+   **Minimum required fields:**
+   - `tenantId`, `subscriptionId` (top level)
+   - `purview.resourceGroupName`, `purview.accountName` (for `foundation` tag)
+   - `aiFoundry.subscriptionId`, `aiFoundry.resourceGroupName` (for `foundry` tag)
+   - `defenderForAI.enableDefenderForCloudPlans[]` (for `defender` tag)
+   
+   **Optional fields** (automation skips if missing):
+   - `activityExport.*` (skip audit exports)
+   - `foundry.contentSafety.*` (skip Content Safety config)
+   - `fabric.*` (Fabric features not yet implemented)
+   - `dlpPolicy`, `labels`, `retentionPolicies` (only needed for `m365` tag)
+
+3. **Optional:** Adjust `infra/main.bicepparam` (tags, spec path, Microsoft 365 auth options).
+
+4. **Execute `azd up`** or run `./run.ps1` directly (see execution paths above).
+
+5. **Microsoft 365 steps** (desktop only) - From a workstation with MFA capability:
+   ```powershell
+   ./run.ps1 -Tags m365 -ConnectM365 -M365UserPrincipalName <upn> -SpecPath ./spec.local.json
+   ```
+   This publishes Secure Interactions, DLP, labels, and retention policies.
+
+| [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/microsoft/Data-Agent-Governance-and-Security-Accelerator) | [![Open in Dev Containers](https://img.shields.io/static/v1?style=for-the-badge&label=Dev%20Containers&message=Open&color=blue&logo=visualstudiocode)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/microsoft/Data-Agent-Governance-and-Security-Accelerator) | [![Open in Visual Studio Code Web](https://img.shields.io/static/v1?style=for-the-badge&label=Visual%20Studio%20Code%20(Web)&message=Open&color=blue&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/azure/?vscode-azure-exp=foundry&agentPayload=eyJiYXNlVXJsIjogImh0dHBzOi8vZ2l0aHViLmNvbS9taWNyb3NvZnQvRGF0YS1BZ2VudC1Hb3Zlcm5hbmNlLWFuZC1TZWN1cml0eS1BY2NlbGVyYXRvciIsICJpbmRleFVybCI6ICIvcmVmczo6aGVhZHMvbWFpbi9pbmZyYS92c2NvZGVfd2ViIiwgY2xhaW1zIjogeyJ3b3JrZmxvdyI6ICJjbG9uZSJ9fQ==) |
 | --- | --- | --- |
 
+### ⚠️ CRITICAL POST-DEPLOYMENT STEPS
 
+After automation completes, you **MUST** manually enable two settings that cannot be automated via API:
+
+**1. Purview DSPM - Secure interactions for enterprise AI apps:**
+1. Sign in to [https://web.purview.azure.com](https://web.purview.azure.com)
+2. Navigate: **Data Security Posture Management for AI** → **Recommendations** → **Secure interactions for enterprise AI apps**
+3. Click **Enable**
+
+**2. Defender for Cloud - Enable data security for AI interactions:**
+1. Sign in to the [Azure portal](https://portal.azure.com)
+2. Navigate: **Microsoft Defender for Cloud** → **Environment settings** → Select your subscription
+3. Under **Defender plans**, locate **AI Services** → Click **Settings**
+4. Toggle **Enable data security for AI interactions** to **On** → Click **Save**
+
+**Why this matters:** Without these manual toggles, AI interaction data (prompts/responses) will NOT be captured by Purview DSPM or Defender for AI for threat detection and compliance analysis.
+
+See [Required Manual Checkpoints](#required-manual-checkpoints) for complete post-deployment checklist.
 
 > 🛠️ **Need help?** Review the [Troubleshooting Guide](./docs/TroubleshootingGuide.md) for solutions to common azd and Purview authentication issues.
+
+---
+
+## Common Deployment Scenarios
+
+| I want to... | Run these tags | Prerequisites | Key spec sections |
+|-------------|----------------|---------------|-------------------|
+| **Secure Azure AI Foundry only** | `defender,foundry` | Azure Contributor on subscription with Foundry projects | `aiFoundry.*`, `foundry.resources[]`, `defenderForAI.enableDefenderForCloudPlans` |
+| **Full Purview DSPM for AI (no M365)** | `foundation,dspm,defender,foundry` | Azure Contributor + Purview Data Source Admin | All Azure sections (skip `dlpPolicy`, `labels`, `retentionPolicies`) |
+| **Enable M365 Copilot governance** | `m365` (run separately from desktop) | Desktop + MFA + Exchange Online admin + E5 license | `dlpPolicy`, `labels`, `retentionPolicies` |
+| **Everything** | `all` OR `foundation,dspm,defender,foundry,m365` | All of the above (may require multiple operators) | All spec sections |
+| **Re-run audit exports only** | `audit` | Audit Reader role in Purview + populated `activityExport` | `activityExport.*` |
+
+---
+
+## Foundry-Only Configuration
+
+To configure governance for only Azure AI Foundry projects without full Purview DSPM or M365 setup:
+
+### Prerequisites
+- Azure Contributor RBAC on the subscription containing your Foundry projects
+- PowerShell 7.x and Az modules installed
+- Azure Developer CLI (azd) 1.9.0+ and Azure CLI 2.58.0+
+
+### Spec preparation
+Populate only these sections in `spec.local.json`:
+```json
+{
+  "tenantId": "<your-tenant-id>",
+  "subscriptionId": "<subscription-with-foundry>",
+  "aiFoundry": {
+    "subscriptionId": "<same-subscription>",
+    "resourceGroupName": "<foundry-resource-group>"
+  },
+  "foundry": {
+    "resources": [
+      {
+        "name": "<foundry-project-name>",
+        "resourceGroup": "<foundry-resource-group>"
+      }
+    ]
+  },
+  "defenderForAI": {
+    "enableDefenderForCloudPlans": ["CognitiveServices", "Storage"]
+  }
+}
+```
+
+### Deploy commands
+```powershell
+# Sign in (all required for automation to work)
+az login
+azd auth login
+Connect-AzAccount -Tenant <tenantId> -Subscription <subscriptionId>
+Set-AzContext -Subscription <subscriptionId>
+
+# Run only Foundry + Defender tags
+./run.ps1 -Tags defender,foundry -SpecPath ./spec.local.json
+```
+
+### What this enables
+✅ Defender for AI plans on Cognitive Services resources  
+✅ Diagnostic settings streaming to Log Analytics  
+✅ Content Safety blocklists (if `foundry.contentSafety` configured in spec)  
+✅ Resource tagging for governance lineage  
+
+### What you DON'T get without other tags
+❌ No Purview DSPM scanning of data sources  
+❌ No M365 KYD/DLP policies for Copilot  
+❌ No audit exports to external storage  
+❌ No Purview registration of Foundry projects (use `foundation` tag to add this)
 
 ---
 
@@ -76,6 +256,22 @@ Follow the [Deployment Guide](./docs/DeploymentGuide.md) for detailed prerequisi
 ---
 
 ## Prerequisites and costs
+
+> ⚠️ **IMPORTANT - Multiple Operator Accounts Required for Full Deployment**
+>
+> Running `-Tags all` requires coordinating **multiple privileged identities**. A single user can complete the deployment if they hold all roles, but the `m365` tag requires interactive MFA from a desktop (not containers/Codespaces).
+>
+> | Tag(s) | Required Identity | Why |
+> |--------|-------------------|-----|
+> | `foundation`, `dspm`, `defender`, `foundry` | **Azure Contributor** + **Purview Data Source Admin** | Creates Azure resources, registers data sources in Purview catalog |
+> | `m365` | **Compliance Administrator** with **MFA-capable workstation** | Interactive Exchange Online auth to enable Unified Audit and create KYD policies |
+> | Audit exports (`audit` tag or scripts 20-21) | **Audit Reader** OR **Compliance Admin** in Purview | Management Activity API access for compliance evidence |
+>
+> **Single-user scenario:** If one person holds all roles, run `foundation,dspm,defender,foundry` from any environment, then switch to a desktop to run `m365` separately.
+>
+> **Team scenario:** Azure admin runs automation tags from containers/CI; compliance admin runs `m365` from their workstation independently.
+
+### Core requirements
 - Contributor RBAC on the subscription(s) hosting Purview, Defender, and Azure AI resources.
 - Microsoft 365 E5 (or E5 Compliance) license for the operator enabling Secure Interactions and Unified Audit.
 - Exchange Online + Security & Compliance PowerShell access (MFA-capable workstation) for the `m365` tag.
@@ -113,6 +309,7 @@ A data protection program is tasked with lighting up Microsoft Purview Data Secu
 ---
 
 ## Supporting documentation
+- [Architecture Overview](./docs/ArchitectureOverview.md) - Technical architecture and class diagram
 - [Deployment Guide](./docs/DeploymentGuide.md)
 - [Troubleshooting Guide](./docs/TroubleshootingGuide.md)
 - [DSPM sales and stakeholder narrative](./docs/dspm-sales-narrative.md)
@@ -351,13 +548,21 @@ Manual steps exist where Microsoft has not yet exposed APIs or where MFA-capable
 1. **Secure interactions / KYD policy (Purview portal)**
   - Navigate to **https://web.purview.azure.com** → **Data Security Posture Management for AI** → **Recommendations** → **Secure interactions for enterprise AI apps**. Be sure it is enabled
 
-2. **Exchange Online desktop session for `m365` tag (desktop required, not containers/Codespaces)**
+2. **Defender for Cloud - Enable data security for AI interactions**
+  - Sign in to the [Azure portal](https://portal.azure.com)
+  - Navigate to **Microsoft Defender for Cloud** → **Environment settings** → Select your subscription
+  - Under **Defender plans**, locate **AI Services** (or **Cognitive Services**)
+  - Click **Settings** → Toggle **Enable data security for AI interactions** to **On**
+  - Click **Save**
+  - **Why this matters:** This setting cannot be automated via API yet. Without it, Defender for AI will not capture AI interaction telemetry for threat detection and posture analysis.
+
+3. **Exchange Online desktop session for `m365` tag (desktop required, not containers/Codespaces)**
   - Open PowerShell 7 on a workstation with browser-based MFA, install/update the Exchange Online Management module, and run `./run.ps1 -Tags m365 -ConnectM365 -M365UserPrincipalName <upn>`.
-  - Approve the MFA prompts, confirm Unified Audit reports “Enabled,” and verify the Secure interactions (KYD) policy appears under **Data lifecycle management** in the Purview portal.
-3. **Communication Compliance / Insider Risk previews**
+  - Approve the MFA prompts, confirm Unified Audit reports "Enabled," and verify the Secure interactions (KYD) policy appears under **Data lifecycle management** in the Purview portal.
+4. **Communication Compliance / Insider Risk previews**
   - In the Microsoft Purview compliance portal, browse to **Communication Compliance** and **Insider Risk Management** to enable any required preview policies or monitoring templates (for example sensitive keywords, channel monitoring, or policy templates tied to AI prompts).
   - Document approvals with screenshots or exports; these features remain portal-only.
-4. **Post-run review and evidence capture**
+5. **Post-run review and evidence capture**
   - Check Defender for Cloud, Purview DSPM dashboards, and Azure Policy compliance to ensure new registrations/scans are reflected.
   - Run `17-Export-ComplianceInventory.ps1` / `21-Export-Audit.ps1` only after confirming telemetry is flowing, then upload the artifacts to your evidence repository (SharePoint, Fabric, or storage account) for audit traceability.
   - If Fabric scans are enabled later, confirm in the Purview portal that the scan job completed successfully; rerun manually when changes occur.

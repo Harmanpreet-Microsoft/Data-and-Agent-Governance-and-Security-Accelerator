@@ -2,15 +2,43 @@
 
 Follow this guide to deploy the Data Agent Governance and Security Accelerator (DAGA) into your Azure subscription using the Azure Developer CLI (azd).
 
-> **Tooling requirements**
->
-> - Azure Developer CLI (azd) **1.9.0 or later**
-> - Azure CLI **2.58.0 or later**
-> - PowerShell **7.x**
-> - Az PowerShell modules (`Install-Module Az -Scope CurrentUser -Force`)
-> - Exchange Online Management module (required when running the `m365` tag)
->
-> Use `azd version`, `az --version`, and `pwsh --version` to verify the versions installed on your machine.
+---
+
+## Before You Begin - Validation Checklist
+
+Before starting, confirm you have the following ready:
+
+### Tooling requirements
+
+| Tool | Minimum Version | Check Command | Install Link |
+|------|-----------------|---------------|---------------|
+| Azure Developer CLI (azd) | 1.9.0+ | `azd version` | [Install azd](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd) |
+| Azure CLI | 2.58.0+ | `az --version` | [Install Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) |
+| PowerShell | 7.x | `pwsh --version` | [Install PowerShell](https://learn.microsoft.com/powershell/scripting/install/installing-powershell) |
+| Az PowerShell modules | Latest | `Get-Module Az -ListAvailable` | `Install-Module Az -Scope CurrentUser -Force` |
+| Exchange Online module | Latest (for m365 tag) | `Get-Module ExchangeOnlineManagement -ListAvailable` | `Install-Module ExchangeOnlineManagement -Scope CurrentUser` |
+
+### Azure resources you'll need to identify
+
+Gather this information before configuring your spec file:
+
+| Information | Where to find it | Example |
+|-------------|------------------|----------|
+| Tenant ID | Azure Portal → Entra ID → Overview | `12345678-1234-1234-1234-123456789012` |
+| Subscription ID | Azure Portal → Subscriptions | `87654321-4321-4321-4321-210987654321` |
+| Purview account name | Azure Portal → Microsoft Purview accounts | `contoso-purview` |
+| Purview resource group | Azure Portal → Microsoft Purview accounts → Overview | `rg-purview-prod` |
+| AI Foundry project name | Azure AI Foundry portal → Settings | `contoso-ai-project` |
+| AI resource group | Azure Portal → Resource groups | `rg-ai-foundry` |
+| Log Analytics workspace ID | Azure Portal → Log Analytics → Properties → Workspace ID | `/subscriptions/.../workspaces/contoso-logs` |
+
+### Permissions checklist
+
+- [ ] **Azure Contributor** on subscription(s) with Purview, AI Foundry, and Defender resources
+- [ ] **Purview Data Source Administrator** for registering data sources
+- [ ] **Microsoft 365 E5 or E5 Compliance license** (for m365 tag)
+- [ ] **Compliance Administrator** role in Microsoft 365 (for Unified Audit and DLP)
+- [ ] **Exchange Online admin** access from MFA-capable workstation (for m365 tag)
 
 ---
 
@@ -19,7 +47,7 @@ Follow this guide to deploy the Data Agent Governance and Security Accelerator (
 ```powershell
 cd <working-directory>
 git clone https://github.com/microsoft/Data-Agent-Governance-and-Security-Accelerator.git
-git checkout readme-update-120225
+cd Data-Agent-Governance-and-Security-Accelerator
 ```
 
 Open the folder in VS Code, Codespaces, or a devcontainer if you prefer a managed environment.
@@ -44,15 +72,130 @@ Replace the placeholders with the values at the top of your `spec.local.json`. I
 
 ## 3. Prepare the spec
 
-1. Generate or refresh the schema:
-   ```powershell
-   pwsh ./scripts/governance/00-New-DspmSpec.ps1 -OutFile ./spec.dspm.template.json
-   ```
-2. Create your local copy and keep it out of source control:
-   ```powershell
-   Copy-Item ./spec.dspm.template.json ./spec.local.json
-   ```
-3. Populate the JSON with tenant IDs, Purview account info, Foundry projects, Defender plans, and optional `activityExport` settings. Use Key Vault references for secrets whenever possible.
+The spec file (`spec.local.json`) is the central configuration that drives all automation. Here's how to configure it:
+
+### Step 3.1: Create your local spec file
+
+```powershell
+# Optional: Regenerate template if schema has changed
+pwsh ./scripts/governance/00-New-DspmSpec.ps1 -OutFile ./spec.dspm.template.json
+
+# Create your working copy (this file is gitignored)
+Copy-Item ./spec.dspm.template.json ./spec.local.json
+```
+
+### Step 3.2: Configure required fields
+
+Open `spec.local.json` and replace placeholders with your actual values:
+
+```json
+{
+  "tenantId": "12345678-1234-1234-1234-123456789012",
+  "subscriptionId": "87654321-4321-4321-4321-210987654321",
+  "resourceGroup": "rg-daga-governance",
+  "location": "eastus",
+  "purviewAccount": "contoso-purview",
+  "purviewResourceGroup": "rg-purview-prod",
+  "purviewSubscriptionId": "87654321-4321-4321-4321-210987654321"
+}
+```
+
+### Step 3.3: Configure AI Foundry resources (for `foundry` tag)
+
+```json
+{
+  "aiResourceGroup": "rg-ai-foundry",
+  "aiSubscriptionId": "87654321-4321-4321-4321-210987654321",
+  "aiFoundry": {
+    "name": "contoso-ai-project",
+    "resourceId": "/subscriptions/87654321-4321-4321-4321-210987654321/resourceGroups/rg-ai-foundry/providers/Microsoft.CognitiveServices/accounts/contoso-ai-project"
+  },
+  "foundry": {
+    "resources": [
+      {
+        "name": "contoso-openai",
+        "resourceId": "/subscriptions/87654321-4321-4321-4321-210987654321/resourceGroups/rg-ai-foundry/providers/Microsoft.CognitiveServices/accounts/contoso-openai",
+        "diagnostics": true,
+        "tags": { "environment": "production", "costCenter": "AI-governance" }
+      }
+    ]
+  }
+}
+```
+
+**Tip:** Find your resource IDs in Azure Portal → Resource → Properties → Resource ID
+
+### Step 3.4: Configure Defender for AI (for `defender` tag)
+
+```json
+{
+  "defenderForAI": {
+    "enableDefenderForCloudPlans": [
+      "CognitiveServices",
+      "Storage"
+    ],
+    "logAnalyticsWorkspaceId": "/subscriptions/87654321-4321-4321-4321-210987654321/resourceGroups/rg-monitoring/providers/Microsoft.OperationalInsights/workspaces/contoso-logs",
+    "diagnosticCategories": [
+      "Audit",
+      "RequestResponse",
+      "AllMetrics"
+    ]
+  }
+}
+```
+
+### Step 3.5: Configure M365 compliance (for `m365` tag) - Optional
+
+These sections are only needed if you're running the `m365` tag for DLP, labels, and retention:
+
+```json
+{
+  "dlpPolicy": {
+    "name": "AI Egress Control",
+    "mode": "Enforce",
+    "locations": { "Exchange": "All", "SharePoint": "All", "OneDrive": "All", "Teams": "All" },
+    "rules": [
+      {
+        "name": "Block Sensitive Data to AI",
+        "sensitiveInfoTypes": [
+          { "name": "Credit Card Number", "count": 1, "confidence": 85 }
+        ],
+        "blockAccess": true,
+        "notifyUser": true
+      }
+    ]
+  },
+  "labels": [
+    {
+      "name": "Confidential - AI Restricted",
+      "publishPolicyName": "Publish: Confidential",
+      "encryptionEnabled": true
+    }
+  ],
+  "retentionPolicies": [
+    {
+      "name": "AI Data - 7 Years",
+      "rules": [{ "name": "Keep 7y then Delete", "durationDays": 2557, "action": "Delete" }],
+      "locations": { "Exchange": "All", "SharePoint": "All", "OneDrive": "All" }
+    }
+  ]
+}
+```
+
+### Step 3.6: Validate your spec
+
+Before running, verify your JSON is valid:
+
+```powershell
+# Check JSON syntax
+Get-Content ./spec.local.json | ConvertFrom-Json
+
+# If no errors, you're ready to proceed
+```
+
+### Spec field reference
+
+See the complete [Spec Field Reference](./spec-local-reference.md) for detailed documentation of every field.
 
 ---
 
