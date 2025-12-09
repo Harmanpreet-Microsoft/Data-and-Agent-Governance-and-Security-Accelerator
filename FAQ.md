@@ -7,7 +7,17 @@ Run it on **Day 0**, before end-user AI workloads are deployed. Stage the script
 Use `run.ps1 -Tags foundation,dspm` for the Purview/audit/policy modules, then `run.ps1 -Tags defender,foundry` for Defender plans and Foundry integrations. Each underlying PowerShell script is idempotent and can also be invoked individually for even finer control.
 
 ## Which steps remain manual?
-Microsoft has not published APIs for the Defender portal toggles ("Enable data security for AI interactions" and "Enable suspicious prompt evidence"). After the scripts run, you must flip those switches **in the portal**, then rerun the verification script to confirm the state.
+Several portal toggles cannot be automated via API today and must be enabled manually:
+
+**In Defender for Cloud** (Azure portal → Defender for Cloud → Environment settings → [subscription] → AI services → Settings):
+- **Enable user prompt evidence** — Includes suspicious prompt segments in Defender alerts
+- **Enable data security for AI interactions** — Connects Azure AI telemetry to Microsoft Purview for DSPM for AI
+
+**In Microsoft Purview** (Purview portal → DSPM for AI):
+- **Activate Microsoft Purview Audit** — Required for audit log ingestion (DSPM for AI → Overview → Get Started)
+- **Secure interactions from enterprise apps** — The KYD collection policy for enterprise AI apps (DSPM for AI → Recommendations)
+
+After the scripts run, you must enable these toggles **in the portal**, then rerun the verification script (`34-Validate-Posture.ps1`) to confirm the state.
 
 ## Can I test the Defender scripts by toggling settings off and rerunning them?
 Yes—but rerunning the PowerShell will only detect that the portal toggle is off and remind you to re-enable it. It cannot flip the switch back on; do that manually in Defender for Cloud and re-run the validation script for confirmation.

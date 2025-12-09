@@ -119,18 +119,14 @@ azd up
 
 ### Post-deployment manual steps
 
-After automation completes, you **MUST** manually enable two settings that cannot be automated via API:
+After automation completes, you **MUST** manually enable several settings that cannot be automated via API:
 
-**1. Purview DSPM - Secure interactions for enterprise AI apps:**
-1. Sign in to [https://web.purview.azure.com](https://web.purview.azure.com)
-2. Navigate: **Data Security Posture Management for AI** > **Recommendations** > **Secure interactions for enterprise AI apps**
-3. Click **Enable**
-
-**2. Defender for Cloud - Enable data security for AI interactions:**
-1. Sign in to the [Azure portal](https://portal.azure.com)
-2. Navigate: **Microsoft Defender for Cloud** > **Environment settings** > Select your subscription
-3. Under **Defender plans**, locate **AI Services** > Click **Settings**
-4. Toggle **Enable data security for AI interactions** to **On** > Click **Save**
+| Portal | Toggle | Navigation | Purpose |
+|--------|--------|------------|---------|
+| **Defender for Cloud** | Enable user prompt evidence | Azure portal → Defender for Cloud → Environment settings → [subscription] → AI services → Settings | Includes suspicious prompt segments in Defender alerts |
+| **Defender for Cloud** | Enable data security for AI interactions | Azure portal → Defender for Cloud → Environment settings → [subscription] → AI services → Settings | Connects Azure AI telemetry to Purview DSPM for AI |
+| **Microsoft Purview** | Activate Microsoft Purview Audit | Purview portal → DSPM for AI → Overview → Get Started | Required for audit log ingestion |
+| **Microsoft Purview** | Secure interactions from enterprise apps | Purview portal → DSPM for AI → Recommendations | KYD collection policy for enterprise AI apps |
 
 **Why this matters:** Without these manual toggles, AI interaction data (prompts/responses) will NOT be captured by Purview DSPM or Defender for AI for threat detection and compliance analysis.
 
