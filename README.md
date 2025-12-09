@@ -56,7 +56,6 @@ This accelerator orchestrates Azure and Microsoft 365 governance artifacts throu
 | **Cross-cloud posture telemetry** | Stream diagnostics to Log Analytics, ensure Secure Interactions/KYD capture prompts and responses, and collect compliance inventory snapshots for auditors. |
 | **CI + desktop friendly automation** | Run `azd up` to replay deterministic checklists in devcontainers, Codespaces, or local shells. |
 | **Extensible evidence exports** | Reuse the audit export, compliance inventory, and tagging scripts as building blocks for bespoke regulator packages or SIEM pipelines. |
-| **Microsoft Foundry control plane governance** | *(Coming soon - not yet available)* Apply Azure Policies, Defender for AI plans, diagnostics, tagging, and Content Safety guardrails to every Foundry project listed in the spec. This capability is on the roadmap. |
 
 </details>
 
@@ -115,6 +114,8 @@ azd up
 **4. Complete manual steps** (see below)
 
 > **Need alternative deployment options?** See [Alternative Deployment Paths](./docs/AlternativeDeploymentPaths.md) for run.ps1 tags, M365 desktop deployment, CI/CD integration, and GitHub Actions workflows.
+
+> **Something go wrong?** See [Undo and Rollback](./docs/AlternativeDeploymentPaths.md#undo-and-rollback) for cleanup steps, partial deployment recovery, and `azd down` guidance.
 
 ### Post-deployment manual steps
 

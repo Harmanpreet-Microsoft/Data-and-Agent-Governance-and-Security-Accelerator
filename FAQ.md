@@ -3,9 +3,6 @@
 ## When should this automation run relative to Copilot, Azure AI Foundry, or ChatGPT Enterprise onboarding?
 Run it on **Day 0**, before end-user AI workloads are deployed. Stage the scripts so Purview DSPM for AI and unified audit are enabled first, then follow immediately with Defender for AI and Foundry tagging. That guarantees telemetry and governance data flow as soon as AI apps launch.
 
-## Why does Purview DSPM for AI need to live on the same subscription as Defender for AI?
-The Defender toggle **Enable data security for AI interactions** only streams prompt evidence to the Purview account that sits in the same subscription. If they differ, Purview’s DSPM dashboards never receive the Foundry telemetry.
-
 ## How can I run the scripts in stages?
 Use `run.ps1 -Tags foundation,dspm` for the Purview/audit/policy modules, then `run.ps1 -Tags defender,foundry` for Defender plans and Foundry integrations. Each underlying PowerShell script is idempotent and can also be invoked individually for even finer control.
 
@@ -23,24 +20,12 @@ Yes. `scripts/governance/dspmPurview/12-Create-DlpPolicy.ps1` uses Exchange Onli
 - When the cmdlet lacks permissions, it returns "The command completed successfully but no settings have been modified." That’s your cue to rerun the m365 tag with an appropriately privileged account or flip the toggle manually in the Purview/Microsoft 365 Compliance portal.
 - Managed identities/UAMIs cannot satisfy these M365 roles today, so keep using an interactive account (or certificate-based auth) that meets the compliance requirements.
 
-## What does enabling Unified Audit actually do, and why is it mandatory?
+## What does enabling Unified Audit actually do, and when is it needed?
 - Unified audit logging turns on the Microsoft 365-wide pipeline that aggregates events from Exchange Online, SharePoint/OneDrive, Teams, Entra ID, Power BI, etc., into the central Purview audit log.
-- Without it, workloads either don’t emit audit events at all or keep them locked in per-service logs, so KYD, DLP, Insider Risk, eDiscovery, and Communication Compliance have nothing to reference.
-- Once enabled, the Purview compliance portal (**https://compliance.microsoft.com** → **Audit**) can search across all workloads with one query, and downstream APIs (Management Activity, Office 365 Management API, Purview Audit (Premium), scripts `21-Export-Audit.ps1` / `22-Ship-AuditToStorage.ps1`) can stream those events to SIEMs, storage, or Fabric Lakehouse.
-- It’s the foundation for Know Your Data: the `m365` tag publishes DLP/labels/retention, but without Unified Audit you can’t prove “user X sent prompt Y,” so auditors will reject the evidence package.
-- Azure diagnostics for Foundry/OpenAI resources (wired up via `07-Enable-Diagnostics.ps1`) complement Unified Audit by capturing platform logs in Log Analytics; together they provide both Microsoft 365 and Azure telemetry for prompts, responses, and control-plane changes.
-
-## If Unified Audit is an M365 control, why is it required for Foundry?
-- The accelerator’s Know Your Data (Secure Interactions) policy stores every Foundry prompt/response inside the user’s Exchange mailbox so Purview can apply retention, DLP, and insider-risk rules. Exchange refuses to persist that evidence if Unified Audit is off.
-- Without Unified Audit the Secure Interactions policy can’t capture prompts, which means there is no chain of custody tying Foundry chats to compliance controls—retention, DLP, Insider Risk, or eDiscovery have nothing to act on.
-- Downstream evidence (`21-Export-Audit.ps1`, `17-Export-ComplianceInventory.ps1`, Management Activity exports) would simply miss the interactions, leaving auditors without proof that Foundry prompts were governed.
-- Turning on Unified Audit therefore becomes the bridge that lets Purview treat Foundry prompts like any other audited workload even though the toggle lives in Exchange Online.
-
-## Why does `07-Enable-Diagnostics.ps1` connect Foundry to Log Analytics?
-- The script enables diagnostic settings on every Foundry/Azure AI resource listed in your spec and sends the logs to a Log Analytics workspace. That stream includes `AzureDiagnostics`, Cognitive Services telemetry, Content Safety events, and other platform signals Defender for Cloud consumes.
-- Defender for AI analytics rely on those logs to correlate with Purview prompt evidence. Without diagnostics you only have the Microsoft 365 side of the story—no resource-level traces, no SOC hunting queries, and limited incident reconstruction.
-- Log Analytics provides a persistent history you can query with KQL, forward to Sentinel, or package as evidence. When regulators ask for “show me every prompt this project processed,” you pair Unified Audit (KYD policy) with the Azure diagnostics captured here.
-- Microsoft’s DSPM-for-AI Learn articles emphasize collection policies, Secure Interactions, and the Defender-for-Cloud “Enable data security for Azure AI” switch. They assume telemetry lands in a workspace; wiring diagnostics through this script satisfies that expectation automatically with no extra portal clicks.
+- Without it, M365 workloads either don't emit audit events at all or keep them locked in per-service logs, so M365 Copilot governance features (DLP, Insider Risk, eDiscovery, Communication Compliance) have nothing to reference.
+- Once enabled, the Purview compliance portal (**https://compliance.microsoft.com** → **Audit**) can search across all M365 workloads with one query, and downstream APIs (Management Activity, Office 365 Management API, Purview Audit (Premium), scripts `21-Export-Audit.ps1` / `22-Ship-AuditToStorage.ps1`) can stream those events to SIEMs, storage, or Fabric Lakehouse.
+- It's needed for M365 Copilot governance: the `m365` tag publishes DLP/labels/retention for M365 Copilot prompt/response capture.
+- **Note:** Azure AI Foundry prompts do NOT flow through Unified Audit. Foundry telemetry is captured via Azure diagnostics and Defender for AI instead.
 
 ## Why are there two `logAnalyticsWorkspaceId` fields in the spec?
 - The top-level `logAnalyticsWorkspaceId` (near the subscription/resourceGroup fields) is the “general purpose” workspace. Purview scans, tagging diagnostics, and other scripts wire telemetry here if they need a workspace and you don’t override it elsewhere.
@@ -63,16 +48,16 @@ Yes. `scripts/governance/dspmPurview/12-Create-DlpPolicy.ps1` uses Exchange Onli
 	- `07-Enable-Diagnostics.ps1` only enables diagnostics on the resource IDs it knows, so omitting the workspace means no Defender log stream.
 - Bottom line: Purview can display any discovered Foundry account, but listing it in the spec is what ties it into tagging, Content Safety configuration, diagnostics routing, and subsequent posture validation when you rerun the accelerator.
 
-## Do I need Azure diagnostics for Foundry in addition to Unified Audit?
-- Yes—Unified Audit covers Microsoft 365 endpoints (Teams, SharePoint, Exchange, KYD evidence), while Azure diagnostics capture logs from the Foundry/OpenAI resources themselves (API calls, request/response payload metadata, Content Safety enforcement).
-- `07-Enable-Diagnostics.ps1` enables Diagnostic Settings on each Foundry/Cognitive Services resource listed in the spec and ships them to the specified Log Analytics workspace. Those logs power Defender for AI detections and give you platform-level visibility that Unified Audit can’t provide.
-- Together they close the gap: Unified Audit proves what users did inside Microsoft 365, while Azure diagnostics prove what the AI infrastructure processed or attempted.
+## Do I need Azure diagnostics for Foundry?
+- Yes—Azure diagnostics capture logs from Foundry/OpenAI resources (API calls, request/response payload metadata, Content Safety enforcement) and send them to Log Analytics.
+- `07-Enable-Diagnostics.ps1` enables Diagnostic Settings on each Foundry/Cognitive Services resource listed in the spec and ships them to the specified Log Analytics workspace. Those logs power Defender for AI detections and give you platform-level visibility.
+- Note: Unified Audit is a separate M365 control for Teams, SharePoint, Exchange, and M365 Copilot. Azure AI Foundry prompts do NOT flow through Unified Audit—they are captured via Azure diagnostics and Defender for AI instead.
 
 ## How does Purview DSPM use the Foundry diagnostics stream?
 - `30-Foundry-RegisterResources.ps1` links every listed Azure AI Foundry workspace/project to its diagnostic stream so Purview knows which resource emitted which prompts and posture signals.
-- `07-Enable-Diagnostics.ps1` pushes Foundry logs and metrics into Log Analytics; Purview ingests those signals to validate the **Secure interactions for enterprise AI apps** recommendation (prompt capture plus Content Safety/policy enforcement).
-- With telemetry flowing, DSPM can correlate Foundry resources with sensitivity labels, DLP policies, and KYD capture to raise alerts when chats touch sensitive data or a workspace drifts from the prescribed guardrails.
-- The same telemetry flows into DSPM dashboards and compliance exports (`17-Export-ComplianceInventory.ps1`, `21-Export-Audit.ps1`) so auditors can prove prompts/responses were monitored and retained per policy.
+- `07-Enable-Diagnostics.ps1` pushes Foundry logs and metrics into Log Analytics; Defender for AI ingests those signals for threat detection (prompt injection, jailbreaks, data exfiltration).
+- With telemetry flowing, DSPM can correlate Foundry resources with sensitivity labels and raise alerts when prompts touch sensitive data or a workspace drifts from the prescribed guardrails.
+- The same telemetry flows into DSPM dashboards so auditors can prove prompts/responses were monitored via Defender for AI.
 
 ## Why does a deleted Foundry account or project still show up in DSPM for AI?
 - Microsoft Purview DSPM for AI retains historical telemetry and risk assessments so compliance teams can investigate past activity. Removing the Azure AI Foundry account/project (or deleting the subscription) stops **future** data collection, but previously captured evidence stays in the DSPM dashboard until retention policies purge it.
@@ -106,12 +91,6 @@ Confirming what’s happening: the only part of the accelerator that “register
 	```powershell
 	./run.ps1 -Tags dspm defender -SpecPath ./spec.local.json   # from bash/zsh use: pwsh ./run.ps1 -Tags ...
 	```
-## KYD for Azure data
-For Azure resources (Foundry, Azure OpenAI, storage backing your models), KYD relies on two ingredients instead:
-1. **Secure Interactions policy** (the same one the accelerator reminds you to enable) so prompts route through Exchange and can be labeled, retained, or inspected.
-1. **Diagnostic settings from 07-Enable-Diagnostics.ps1 plus the Foundry registration/tagging scripts**, which tie each workspace/project to Log Analytics and Purview DSPM. Those diagnostics provide the Azure telemetry that KYD uses as context when it shows “this prompt hit sensitive data” in the Purview dashboards.
-
-
 ## How will Azure Based data get labeled and honored by DSPM?
 
 1. DSPM doesn’t reach into Azure storage to stamp labels directly; it honors whatever classification signals Purview already has for those resources. Scans (Purview Data Map, Fabric/Purview ingestion, Defender for Cloud policy evaluations) tag tables, files, and data stores with sensitivity info.
