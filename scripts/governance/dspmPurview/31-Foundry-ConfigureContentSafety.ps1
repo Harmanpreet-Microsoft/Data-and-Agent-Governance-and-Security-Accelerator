@@ -13,7 +13,8 @@ $base = $cs.endpoint.TrimEnd('/')
 $headers = @{}
 $hasKey = $cs.apiKeySecretRef -and $cs.apiKeySecretRef.keyVaultResourceId -and $cs.apiKeySecretRef.secretName
 if($hasKey){
-  $kvRes = Get-AzResource -ResourceId $cs.apiKeySecretRef.keyVaultResourceId -ErrorAction Stop
+  $kvRes = Get-AzResource -ResourceId $cs.apiKeySecretRef.keyVaultResourceId -ErrorAction SilentlyContinue
+  if(-not $kvRes){ Write-Warning "Key Vault not found, skipping Content Safety key fetch: $($cs.apiKeySecretRef.keyVaultResourceId)"; exit 0 }
   $kvName = ($kvRes.ResourceId -split "/")[-1]
   $apiKey = (Get-AzKeyVaultSecret -VaultName $kvName -Name $cs.apiKeySecretRef.secretName -ErrorAction Stop).SecretValueText
   $headers["Ocp-Apim-Subscription-Key"] = $apiKey

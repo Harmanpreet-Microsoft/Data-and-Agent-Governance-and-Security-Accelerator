@@ -61,7 +61,11 @@ $workspaceResourceId = Resolve-WorkspaceResourceId -workspaceId $law -specObj $s
 
 foreach($r in $spec.foundry.resources){
   if(!$r.diagnostics){ continue }
-  $res = Get-AzResource -ResourceId $r.resourceId -ErrorAction Stop
+  $res = Get-AzResource -ResourceId $r.resourceId -ErrorAction SilentlyContinue
+  if(-not $res){
+    Write-Warning "Resource not found, skipping: $($r.resourceId)"
+    continue
+  }
   $diagResourceId = Get-DiagnosticScopeId -resourceId $r.resourceId
   $scopeName = if($diagResourceId -eq $r.resourceId){ $res.Name } else { (Split-Path -Path $diagResourceId -Leaf) }
   $name = "$scopeName-diag"

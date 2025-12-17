@@ -10,7 +10,7 @@ param dagaTags = [
   'foundry'
 ]
 param dagaConnectM365 = true
-param dagaM365UserPrincipalName = 'admin@MngEnv282784.onmicrosoft.com'
+param dagaM365UserPrincipalName = ''
 param dagaM365AppId = ''
 param dagaM365Organization = ''
 param dagaM365CertificateThumbprint = ''

@@ -9,7 +9,11 @@ Ensure-AzContext -TenantId $spec.tenantId -SubscriptionId $spec.subscriptionId
 if(-not $spec.foundry -or -not $spec.foundry.resources){ Write-Host "No foundry.resources"; exit 0 }
 foreach($r in $spec.foundry.resources){
   if(-not $r.resourceId -or $r.resourceId -notmatch '/projects/'){ Write-Host "Skipping non-Foundry resource: $($r.name)" -ForegroundColor Yellow; continue }
-  $res = Get-AzResource -ResourceId $r.resourceId -ErrorAction Stop
+  $res = Get-AzResource -ResourceId $r.resourceId -ErrorAction SilentlyContinue
+  if(-not $res){
+    Write-Warning "Resource not found, skipping: $($r.resourceId)"
+    continue
+  }
   Write-Host "Found resource: $($res.ResourceId)" -ForegroundColor Cyan
   if($r.tags){
     $merged = @{}

@@ -15,8 +15,8 @@ if ($spec.foundry -and $spec.foundry.resources) {
       else{ foreach($prop in $r.tags.PSObject.Properties){ $desiredTags[$prop.Name] = $prop.Value } }
     }
     if($desiredTags.Count -eq 0){ Write-Host "No spec tags defined for $($r.name); skipping" -ForegroundColor DarkGray; continue }
-
-    $res = Get-AzResource -ResourceId $r.resourceId -ErrorAction Stop
+    $res = Get-AzResource -ResourceId $r.resourceId -ErrorAction SilentlyContinue
+    if(-not $res){ Write-Warning "Resource not found, skipping tag update: $($r.resourceId)"; continue }
     if($res.ResourceType -and $res.ResourceType -match '/projects'){ Write-Host "Skipping tag update for project-level resource $($res.ResourceId); Azure tags only apply to the parent account." -ForegroundColor Yellow; continue }
     $merged = @{}
     if($res.Tags -is [Collections.IDictionary]){ $merged += $res.Tags }
