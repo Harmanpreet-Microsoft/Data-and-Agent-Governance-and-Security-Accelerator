@@ -76,6 +76,9 @@ The spec file (`spec.local.json`) is the central configuration that drives all a
 
 ### Step 3.1: Create your local spec file
 
+When you run `azd up`, the preprovision hook creates `spec.local.json` automatically if it doesn't exist. The hook writes the minimum run parameters (tenant, subscription, resource group, location) and supplies empty placeholders for optional sections so the scripts can skip them safely.
+
+If you want to scaffold manually:
 ```powershell
 # Optional: Regenerate template if schema has changed
 pwsh ./scripts/governance/00-New-DspmSpec.ps1 -OutFile ./spec.dspm.template.json
