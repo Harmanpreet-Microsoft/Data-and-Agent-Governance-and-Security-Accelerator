@@ -111,6 +111,10 @@ If you prefer to scaffold manually:
 ```powershell
 Copy-Item ./spec.dspm.template.json ./spec.local.json
 ```
+```bash
+# Bash command
+cp ./spec.dspm.template.json ./spec.local.json
+```
 Edit `spec.local.json` with your tenant ID, subscription ID, Purview account details, and AI Foundry project information. For optional sections, copy blocks from [docs/spec-example.json](docs/spec-example.json).
 
 **3. Deploy:**

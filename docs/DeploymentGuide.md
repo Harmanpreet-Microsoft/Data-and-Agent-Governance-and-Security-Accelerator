@@ -117,6 +117,10 @@ pwsh ./scripts/governance/00-New-DspmSpec.ps1 -OutFile ./spec.dspm.template.json
 # Create your working copy (this file is gitignored)
 Copy-Item ./spec.dspm.template.json ./spec.local.json
 ```
+```bash
+# Bash command
+cp ./spec.dspm.template.json ./spec.local.json
+```
 
 ### Step 3.2: Configure required fields
 

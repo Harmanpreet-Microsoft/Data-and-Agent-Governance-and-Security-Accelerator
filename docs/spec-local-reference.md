@@ -18,6 +18,10 @@ Copy-Item ./docs/spec-example.json ./spec.local.json
 # Option 2: Copy from the template (minimal starting point)
 Copy-Item ./spec.dspm.template.json ./spec.local.json
 ```
+```bash
+# Bash command
+cp ./spec.dspm.template.json ./spec.local.json
+```
 
 Then edit `spec.local.json` with your actual Azure resource IDs and configuration.
 

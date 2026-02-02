@@ -257,6 +257,10 @@ Connect-AzAccount -ServicePrincipal -Tenant '<tenant-guid>' -ApplicationId '<app
 pwsh ./scripts/governance/00-New-DspmSpec.ps1 -OutFile ./spec.dspm.template.json
 Copy-Item ./spec.dspm.template.json ./spec.local.json
 ```
+```bash
+# Bash command
+cp ./spec.dspm.template.json ./spec.local.json
+```
 
 Populate tenant/subscription IDs, Purview settings, Foundry resources, etc.
 
@@ -304,6 +308,10 @@ The repo tracks a sanitized contract in `spec.dspm.template.json`. Create your w
 
 ```powershell
 Copy-Item ./spec.dspm.template.json ./spec.local.json
+```
+```bash
+# Bash command
+cp ./spec.dspm.template.json ./spec.local.json
 ```
 
 This file is listed in `.gitignore` so it stays on your machine.
