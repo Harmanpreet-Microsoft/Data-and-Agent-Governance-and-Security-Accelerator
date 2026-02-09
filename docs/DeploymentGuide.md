@@ -257,7 +257,26 @@ Environment variables (`DAGA_SPEC_PATH`, `DAGA_POSTPROVISION_TAGS`, etc.) overri
 
 ---
 
-## 5. Deploy with `azd up`
+## 5. Install AZ modules (Optional)
+
+If you don't have the required Azure PowerShell modules installed, run the following commands to install them:
+
+```powershell
+# Installs the main Azure PowerShell module, which provides cmdlets for managing Azure resources
+Install-Module Az -Scope CurrentUser -Repository PSGallery -Force
+
+# Installs the Azure Accounts module for authentication and context management
+Install-Module Az.Accounts -Scope CurrentUser -Repository PSGallery -Force
+
+# Installs the Azure Purview module for managing Microsoft Purview resources and data governance
+Install-Module Az.Purview -Scope CurrentUser -Repository PSGallery -Force
+```
+
+These modules enable the PowerShell automation scripts to interact with Azure services. The `-Scope CurrentUser` parameter installs the modules for your user profile only, without requiring administrator privileges.
+
+---
+
+## 6. Deploy with `azd up`
 
 ```powershell
 azd up
@@ -277,7 +296,7 @@ Run `./run.ps1 -Tags m365 -ConnectM365 -M365UserPrincipalName <upn>` from a work
 
 ---
 
-## 6. Post-deployment actions
+## 7. Post-deployment actions
 
 1. **Purview portal toggles** – enable *Secure interactions for enterprise AI apps* in the Purview portal (Data Security Posture Management for AI > Recommendations).
 2. **Role assignments** – ensure the operator account has the Audit Reader (or Compliance Administrator) role before running the audit export scripts.
@@ -286,7 +305,7 @@ Run `./run.ps1 -Tags m365 -ConnectM365 -M365UserPrincipalName <upn>` from a work
 
 ---
 
-## 7. Next steps
+## 8. Next steps
 
 - Customize the spec for additional Foundry projects or Fabric workspaces.
 - Integrate the accelerator into CI/CD by invoking `run.ps1` from GitHub Actions or Azure DevOps.
