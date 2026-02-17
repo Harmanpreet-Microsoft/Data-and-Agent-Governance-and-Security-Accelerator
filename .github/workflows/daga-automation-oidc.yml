@@ -76,7 +76,7 @@ jobs:
             Write-Host "Purview account '$($spec.purviewAccount)' already exists" -ForegroundColor Green
           } else {
             Write-Host "Creating Purview account '$($spec.purviewAccount)'..." -ForegroundColor Yellow
-            New-AzPurviewAccount -Name $spec.purviewAccount -ResourceGroupName $purviewRg -Location $location -IdentityType SystemAssigned -PublicNetworkAccess Enabled
+            New-AzPurviewAccount -Name $spec.purviewAccount -ResourceGroupName $purviewRg -Location $location -PublicNetworkAccess Enabled
             Write-Host "Purview account created successfully" -ForegroundColor Green
           }
 
