@@ -146,7 +146,12 @@ jobs:
           DAGA_M365_CERT_PATH: ${{ runner.temp }}/daga-exo-cert.pfx
           DAGA_M365_CERT_PASSWORD: ${{ secrets.DAGA_M365_CERT_PASSWORD }}
         run: |
-          ./run.ps1 -Tags all -SpecPath $env:DAGA_SPEC_PATH -ConnectM365 -ContinueOnError
+          # Skip Purview-dependent operations until account access is granted
+          # Run only Defender for AI enablement (works without Purview)
+          $command = "./run.ps1 -Tags defender -SpecPath `$env:DAGA_SPEC_PATH -ContinueOnError"
+          Write-Host "Running: $command" -ForegroundColor Cyan
+          Invoke-Expression $command
+        timeout-minutes: 15
 
       - name: Cleanup cert
         if: steps.check_cert.outputs.has_cert == 'true'
