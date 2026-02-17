@@ -94,19 +94,41 @@ jobs:
             }
           }
           
+          # Check if the specified Purview account exists
           $existing = Get-AzPurviewAccount -Name $spec.purviewAccount -ResourceGroupName $purviewRg -ErrorAction SilentlyContinue
+          
           if ($existing) {
             Write-Host "Purview account '$($spec.purviewAccount)' already exists" -ForegroundColor Green
           } else {
-            Write-Host "Creating Purview account '$($spec.purviewAccount)'..." -ForegroundColor Yellow
-            try {
-              New-AzPurviewAccount -Name $spec.purviewAccount -ResourceGroupName $purviewRg -Location $location -PublicNetworkAccess Enabled -EnableSystemAssignedIdentity -SkuCapacity 1 -SkuName Standard
-              Write-Host "Purview account created successfully" -ForegroundColor Green
-            } catch {
-              if ($_.Exception.Message -match "Enterprise Tenant-level Purview Account already exists") {
-                Write-Warning "A Purview account already exists at the tenant level. Skipping creation. Please ensure the spec references the correct existing Purview account."
-              } else {
-                throw
+            Write-Host "Purview account '$($spec.purviewAccount)' not found. Searching for any existing Purview accounts in subscription..." -ForegroundColor Yellow
+            
+            # Try to find any Purview account in the subscription
+            $allAccounts = Get-AzPurviewAccount -ErrorAction SilentlyContinue
+            
+            if ($allAccounts) {
+              $firstAccount = $allAccounts | Select-Object -First 1
+              Write-Host "Found existing Purview account: '$($firstAccount.Name)'. Updating spec to use this account." -ForegroundColor Yellow
+              
+              # Update the spec file with the found account
+              $spec.purviewAccount = $firstAccount.Name
+              $spec.purviewResourceGroup = $firstAccount.ResourceGroupName
+              $spec | ConvertTo-Json -Depth 10 | Set-Content $env:SPEC_PATH -Encoding utf8
+              
+              Write-Host "Spec updated with Purview account: $($firstAccount.Name)" -ForegroundColor Green
+            } else {
+              # No account found, try to create one
+              Write-Host "No existing Purview account found. Attempting to create '$($spec.purviewAccount)'..." -ForegroundColor Yellow
+              try {
+                New-AzPurviewAccount -Name $spec.purviewAccount -ResourceGroupName $purviewRg -Location $location -PublicNetworkAccess Enabled -EnableSystemAssignedIdentity -SkuCapacity 1 -SkuName Standard
+                Write-Host "Purview account created successfully" -ForegroundColor Green
+              } catch {
+                if ($_.Exception.Message -match "Enterprise Tenant-level Purview Account already exists") {
+                  Write-Warning "A Purview account already exists at the tenant level but could not be found. This may be a permissions issue."
+                  Write-Warning "Please ensure your service principal has Reader access to the existing Purview account."
+                  throw "Cannot proceed without access to Purview account. Please grant necessary permissions or update the spec with the correct account name."
+                } else {
+                  throw
+                }
               }
             }
           }
