@@ -98,43 +98,23 @@ jobs:
           $existing = Get-AzPurviewAccount -Name $spec.purviewAccount -ResourceGroupName $purviewRg -ErrorAction SilentlyContinue
           
           if ($existing) {
-            Write-Host "Purview account '$($spec.purviewAccount)' already exists" -ForegroundColor Green
+            Write-Host "✓ Purview account '$($spec.purviewAccount)' found and accessible" -ForegroundColor Green
           } else {
-            Write-Host "Purview account '$($spec.purviewAccount)' not found. Searching for any existing Purview accounts in subscription..." -ForegroundColor Yellow
-            
-            # Try to find any Purview account in the subscription
-            $allAccounts = Get-AzPurviewAccount -ErrorAction SilentlyContinue
-            
-            if ($allAccounts) {
-              $firstAccount = $allAccounts | Select-Object -First 1
-              Write-Host "Found existing Purview account: '$($firstAccount.Name)'. Updating spec to use this account." -ForegroundColor Yellow
-              
-              # Update the spec file with the found account
-              $spec.purviewAccount = $firstAccount.Name
-              $spec.purviewResourceGroup = $firstAccount.ResourceGroupName
-              $spec | ConvertTo-Json -Depth 10 | Set-Content $env:SPEC_PATH -Encoding utf8
-              
-              Write-Host "Spec updated with Purview account: $($firstAccount.Name)" -ForegroundColor Green
-            } else {
-              # No account found, try to create one
-              Write-Host "No existing Purview account found. Attempting to create '$($spec.purviewAccount)'..." -ForegroundColor Yellow
-              try {
-                New-AzPurviewAccount -Name $spec.purviewAccount -ResourceGroupName $purviewRg -Location $location -PublicNetworkAccess Enabled -EnableSystemAssignedIdentity -SkuCapacity 1 -SkuName Standard
-                Write-Host "Purview account created successfully" -ForegroundColor Green
-              } catch {
-                if ($_.Exception.Message -match "Enterprise Tenant-level Purview Account already exists") {
-                  Write-Warning "A Purview account already exists at the tenant level but could not be found."
-                  Write-Warning "This may be due to:"
-                  Write-Warning "  1. Service principal lacks Reader permissions on the existing Purview account"
-                  Write-Warning "  2. The Purview account name in the spec doesn't match the existing account"
-                  Write-Warning ""
-                  Write-Warning "The workflow will continue, but Purview-dependent steps may fail."
-                  Write-Warning "To resolve: Grant the service principal access to the Purview account or update the spec with the correct account name."
-                } else {
-                  throw
-                }
-              }
-            }
+            Write-Error "✗ Purview account '$($spec.purviewAccount)' not found in subscription '$purviewSubId' / resource group '$purviewRg'"
+            Write-Error ""
+            Write-Error "The workflow cannot continue without a Purview account."
+            Write-Error ""
+            Write-Error "To fix this:"
+            Write-Error "1. Find your existing Purview account:"
+            Write-Error "   Get-AzPurviewAccount | Select-Object Name, ResourceGroupName"
+            Write-Error ""
+            Write-Error "2. Update the DAGA_SPEC_JSON secret with the correct values:"
+            Write-Error "   - purviewAccount: <actual-account-name>"
+            Write-Error "   - purviewResourceGroup: <actual-resource-group>"
+            Write-Error ""
+            Write-Error "3. Grant your service principal Reader access to the Purview account"
+            Write-Error ""
+            throw "Purview account not found. Workflow stopped."
           }
 
       - name: Run DSPM accelerator
@@ -146,12 +126,12 @@ jobs:
           DAGA_M365_CERT_PATH: ${{ runner.temp }}/daga-exo-cert.pfx
           DAGA_M365_CERT_PASSWORD: ${{ secrets.DAGA_M365_CERT_PASSWORD }}
         run: |
-          # Skip Purview-dependent operations until account access is granted
-          # Run only Defender for AI enablement (works without Purview)
-          $command = "./run.ps1 -Tags defender -SpecPath `$env:DAGA_SPEC_PATH -ContinueOnError"
+          # Run automation - will fail fast if Purview validation failed above
+          $m365Flag = if ('${{ steps.check_cert.outputs.has_cert }}' -eq 'true') { '-ConnectM365' } else { '' }
+          $command = "./run.ps1 -Tags foundation,dspm,defender,foundry -SpecPath `$env:DAGA_SPEC_PATH $m365Flag"
           Write-Host "Running: $command" -ForegroundColor Cyan
           Invoke-Expression $command
-        timeout-minutes: 15
+        timeout-minutes: 30
 
       - name: Cleanup cert
         if: steps.check_cert.outputs.has_cert == 'true'
