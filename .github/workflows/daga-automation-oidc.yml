@@ -71,6 +71,29 @@ jobs:
           
           Set-AzContext -SubscriptionId $purviewSubId | Out-Null
           
+          # Register Microsoft.Purview resource provider if needed
+          $provider = Get-AzResourceProvider -ProviderNamespace Microsoft.Purview
+          if ($provider.RegistrationState -ne 'Registered') {
+            Write-Host "Registering Microsoft.Purview resource provider..." -ForegroundColor Yellow
+            Register-AzResourceProvider -ProviderNamespace Microsoft.Purview | Out-Null
+            
+            # Wait for registration to complete
+            $timeout = 300 # 5 minutes
+            $elapsed = 0
+            while ($elapsed -lt $timeout) {
+              $provider = Get-AzResourceProvider -ProviderNamespace Microsoft.Purview
+              if ($provider.RegistrationState -eq 'Registered') {
+                Write-Host "Microsoft.Purview registered successfully" -ForegroundColor Green
+                break
+              }
+              Start-Sleep -Seconds 10
+              $elapsed += 10
+            }
+            if ($provider.RegistrationState -ne 'Registered') {
+              throw "Microsoft.Purview registration timed out"
+            }
+          }
+          
           $existing = Get-AzPurviewAccount -Name $spec.purviewAccount -ResourceGroupName $purviewRg -ErrorAction SilentlyContinue
           if ($existing) {
             Write-Host "Purview account '$($spec.purviewAccount)' already exists" -ForegroundColor Green
