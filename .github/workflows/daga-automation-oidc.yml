@@ -36,24 +36,19 @@ jobs:
           $spec | Out-File -FilePath $env:SPEC_PATH -Encoding utf8
 
       - name: Materialize Exchange certificate
+        if: secrets.DAGA_M365_CERT_PFX != ''
         shell: pwsh
         env:
-          CERT_PFX: ${{ secrets.DAGA_M365_CERT_PFX }}
           CERT_PATH: ${{ runner.temp }}/daga-exo-cert.pfx
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:CERT_PFX)) {
-            Write-Host 'No certificate secret provided – skipping.'
-            exit 0
-          }
-          $bytes = [Convert]::FromBase64String($env:CERT_PFX)
-          [System.IO.File]::WriteAllBytes($env:CERT_PATH, $bytes)
+          $bytes = [Convert]::FromBase64String('${{ secrets.DAGA_M365_CERT_PFX }}')
+          [System.IO.File]::WriteAllBytes('$env:CERT_PATH', $bytes)
 
       - name: Install PowerShell modules
         shell: pwsh
         run: |
           Install-Module Az -Scope CurrentUser -Force -AllowClobber
           Install-Module Az.Security -Scope CurrentUser -Force -AllowClobber
-          Install-Module Az.Purview -Scope CurrentUser -Force -AllowClobber
           Install-Module ExchangeOnlineManagement -Scope CurrentUser -Force
 
       - name: Run DSPM accelerator
@@ -68,11 +63,11 @@ jobs:
           ./run.ps1 -Tags all -SpecPath $env:DAGA_SPEC_PATH -ConnectM365
 
       - name: Cleanup cert
-        if: always()
+        if: secrets.DAGA_M365_CERT_PFX != ''
         shell: pwsh
         env:
           CERT_PATH: ${{ runner.temp }}/daga-exo-cert.pfx
         run: |
-          if (Test-Path $env:CERT_PATH) {
-            Remove-Item $env:CERT_PATH -Force
+          if (Test-Path '$env:CERT_PATH') {
+            Remove-Item '$env:CERT_PATH' -Force
           }
