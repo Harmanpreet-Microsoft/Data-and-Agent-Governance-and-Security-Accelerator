@@ -58,6 +58,7 @@ jobs:
         run: |
           Install-Module Az -Scope CurrentUser -Force -AllowClobber
           Install-Module Az.Security -Scope CurrentUser -Force -AllowClobber
+          Install-Module Az.Purview -Scope CurrentUser -Force -AllowClobber
           Install-Module ExchangeOnlineManagement -Scope CurrentUser -Force
 
       - name: Run DSPM accelerator
