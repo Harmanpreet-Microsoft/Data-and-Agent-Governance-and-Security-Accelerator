@@ -36,7 +36,7 @@ jobs:
           $spec | Out-File -FilePath $env:SPEC_PATH -Encoding utf8
 
       - name: Materialize Exchange certificate
-        if: secrets.DAGA_M365_CERT_PFX != ''
+        if: ${{ secrets.DAGA_M365_CERT_PFX != '' }}
         shell: pwsh
         env:
           CERT_PATH: ${{ runner.temp }}/daga-exo-cert.pfx
@@ -63,7 +63,7 @@ jobs:
           ./run.ps1 -Tags all -SpecPath $env:DAGA_SPEC_PATH -ConnectM365
 
       - name: Cleanup cert
-        if: secrets.DAGA_M365_CERT_PFX != ''
+        if: ${{ secrets.DAGA_M365_CERT_PFX != '' }}
         shell: pwsh
         env:
           CERT_PATH: ${{ runner.temp }}/daga-exo-cert.pfx
