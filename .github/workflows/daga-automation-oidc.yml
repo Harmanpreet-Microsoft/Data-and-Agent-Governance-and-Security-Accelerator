@@ -99,8 +99,16 @@ jobs:
             Write-Host "Purview account '$($spec.purviewAccount)' already exists" -ForegroundColor Green
           } else {
             Write-Host "Creating Purview account '$($spec.purviewAccount)'..." -ForegroundColor Yellow
-            New-AzPurviewAccount -Name $spec.purviewAccount -ResourceGroupName $purviewRg -Location $location -PublicNetworkAccess Enabled -EnableSystemAssignedIdentity -SkuCapacity 1 -SkuName Standard
-            Write-Host "Purview account created successfully" -ForegroundColor Green
+            try {
+              New-AzPurviewAccount -Name $spec.purviewAccount -ResourceGroupName $purviewRg -Location $location -PublicNetworkAccess Enabled -EnableSystemAssignedIdentity -SkuCapacity 1 -SkuName Standard
+              Write-Host "Purview account created successfully" -ForegroundColor Green
+            } catch {
+              if ($_.Exception.Message -match "Enterprise Tenant-level Purview Account already exists") {
+                Write-Warning "A Purview account already exists at the tenant level. Skipping creation. Please ensure the spec references the correct existing Purview account."
+              } else {
+                throw
+              }
+            }
           }
 
       - name: Run DSPM accelerator
