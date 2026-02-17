@@ -101,9 +101,3 @@ jobs:
             Remove-Item '$env:CERT_PATH' -Force
           }
 
-      - name: Cleanup infrastructure
-        if: always()
-        run: azd down --force --purge --no-prompt
-        env:
-          AZURE_ENV_NAME: daga-ci-${{ github.run_id }}
-
