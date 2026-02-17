@@ -13,6 +13,15 @@ jobs:
     env:
       SPEC_PATH: ./spec.ci.json
     steps:
+      - name: Check M365 cert availability
+        id: check_cert
+        run: |
+          if [ -n "${{ secrets.DAGA_M365_CERT_PFX }}" ]; then
+            echo "has_cert=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_cert=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -36,7 +45,7 @@ jobs:
           $spec | Out-File -FilePath $env:SPEC_PATH -Encoding utf8
 
       - name: Materialize Exchange certificate
-        if: ${{ secrets.DAGA_M365_CERT_PFX }}
+        if: steps.check_cert.outputs.has_cert == 'true'
         shell: pwsh
         env:
           CERT_PATH: ${{ runner.temp }}/daga-exo-cert.pfx
@@ -63,7 +72,7 @@ jobs:
           ./run.ps1 -Tags all -SpecPath $env:DAGA_SPEC_PATH -ConnectM365
 
       - name: Cleanup cert
-        if: ${{ secrets.DAGA_M365_CERT_PFX }}
+        if: steps.check_cert.outputs.has_cert == 'true'
         shell: pwsh
         env:
           CERT_PATH: ${{ runner.temp }}/daga-exo-cert.pfx
