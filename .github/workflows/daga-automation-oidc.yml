@@ -123,9 +123,13 @@ jobs:
                 Write-Host "Purview account created successfully" -ForegroundColor Green
               } catch {
                 if ($_.Exception.Message -match "Enterprise Tenant-level Purview Account already exists") {
-                  Write-Warning "A Purview account already exists at the tenant level but could not be found. This may be a permissions issue."
-                  Write-Warning "Please ensure your service principal has Reader access to the existing Purview account."
-                  throw "Cannot proceed without access to Purview account. Please grant necessary permissions or update the spec with the correct account name."
+                  Write-Warning "A Purview account already exists at the tenant level but could not be found."
+                  Write-Warning "This may be due to:"
+                  Write-Warning "  1. Service principal lacks Reader permissions on the existing Purview account"
+                  Write-Warning "  2. The Purview account name in the spec doesn't match the existing account"
+                  Write-Warning ""
+                  Write-Warning "The workflow will continue, but Purview-dependent steps may fail."
+                  Write-Warning "To resolve: Grant the service principal access to the Purview account or update the spec with the correct account name."
                 } else {
                   throw
                 }
@@ -142,7 +146,7 @@ jobs:
           DAGA_M365_CERT_PATH: ${{ runner.temp }}/daga-exo-cert.pfx
           DAGA_M365_CERT_PASSWORD: ${{ secrets.DAGA_M365_CERT_PASSWORD }}
         run: |
-          ./run.ps1 -Tags all -SpecPath $env:DAGA_SPEC_PATH -ConnectM365
+          ./run.ps1 -Tags all -SpecPath $env:DAGA_SPEC_PATH -ConnectM365 -ContinueOnError
 
       - name: Cleanup cert
         if: steps.check_cert.outputs.has_cert == 'true'
