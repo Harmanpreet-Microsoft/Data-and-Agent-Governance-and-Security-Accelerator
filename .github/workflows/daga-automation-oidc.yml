@@ -61,6 +61,25 @@ jobs:
           Install-Module Az.Purview -Scope CurrentUser -Force -AllowClobber
           Install-Module ExchangeOnlineManagement -Scope CurrentUser -Force
 
+      - name: Ensure Purview account exists
+        shell: pwsh
+        run: |
+          $spec = Get-Content $env:SPEC_PATH -Raw | ConvertFrom-Json
+          $purviewSubId = if ($spec.purviewSubscriptionId) { $spec.purviewSubscriptionId } else { $spec.subscriptionId }
+          $purviewRg = if ($spec.purviewResourceGroup) { $spec.purviewResourceGroup } else { $spec.resourceGroup }
+          $location = $spec.location
+          
+          Set-AzContext -SubscriptionId $purviewSubId | Out-Null
+          
+          $existing = Get-AzPurviewAccount -Name $spec.purviewAccount -ResourceGroupName $purviewRg -ErrorAction SilentlyContinue
+          if ($existing) {
+            Write-Host "Purview account '$($spec.purviewAccount)' already exists" -ForegroundColor Green
+          } else {
+            Write-Host "Creating Purview account '$($spec.purviewAccount)'..." -ForegroundColor Yellow
+            New-AzPurviewAccount -Name $spec.purviewAccount -ResourceGroupName $purviewRg -Location $location -IdentityType SystemAssigned -PublicNetworkAccess Enabled
+            Write-Host "Purview account created successfully" -ForegroundColor Green
+          }
+
       - name: Run DSPM accelerator
         shell: pwsh
         env:
@@ -81,3 +100,10 @@ jobs:
           if (Test-Path '$env:CERT_PATH') {
             Remove-Item '$env:CERT_PATH' -Force
           }
+
+      - name: Cleanup infrastructure
+        if: always()
+        run: azd down --force --purge --no-prompt
+        env:
+          AZURE_ENV_NAME: daga-ci-${{ github.run_id }}
+
