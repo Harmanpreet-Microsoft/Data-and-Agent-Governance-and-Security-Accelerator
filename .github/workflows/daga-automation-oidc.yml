@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SPEC_PATH: ./spec.ci.json
-      CERT_PATH: ${{ runner.temp }}/daga-exo-cert.pfx
+      HAS_M365_CERT: ${{ secrets.DAGA_M365_CERT_PFX != '' && 'true' || 'false' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,8 +37,10 @@ jobs:
           $spec | Out-File -FilePath $env:SPEC_PATH -Encoding utf8
 
       - name: Materialize Exchange certificate
-        if: ${{ secrets.DAGA_M365_CERT_PFX != '' }}
+        if: env.HAS_M365_CERT == 'true'
         shell: pwsh
+        env:
+          CERT_PATH: ${{ runner.temp }}/daga-exo-cert.pfx
         run: |
           $bytes = [Convert]::FromBase64String('${{ secrets.DAGA_M365_CERT_PFX }}')
           [System.IO.File]::WriteAllBytes('${{ env.CERT_PATH }}', $bytes)
@@ -56,15 +58,15 @@ jobs:
           DAGA_SPEC_PATH: ${{ env.SPEC_PATH }}
           DAGA_M365_APP_ID: ${{ secrets.DAGA_M365_APP_ID }}
           DAGA_M365_ORGANIZATION: ${{ secrets.DAGA_M365_ORGANIZATION }}
-          DAGA_M365_CERT_PATH: ${{ env.CERT_PATH }}
+          DAGA_M365_CERT_PATH: ${{ runner.temp }}/daga-exo-cert.pfx
           DAGA_M365_CERT_PASSWORD: ${{ secrets.DAGA_M365_CERT_PASSWORD }}
         run: |
           ./run.ps1 -Tags all -SpecPath $env:DAGA_SPEC_PATH -ConnectM365
 
       - name: Cleanup cert
-        if: ${{ secrets.DAGA_M365_CERT_PFX != '' }}
+        if: env.HAS_M365_CERT == 'true'
         shell: pwsh
         run: |
-          if (Test-Path '${{ env.CERT_PATH }}') {
-            Remove-Item '${{ env.CERT_PATH }}' -Force
+          if (Test-Path '${{ runner.temp }}/daga-exo-cert.pfx') {
+            Remove-Item '${{ runner.temp }}/daga-exo-cert.pfx' -Force
           }
