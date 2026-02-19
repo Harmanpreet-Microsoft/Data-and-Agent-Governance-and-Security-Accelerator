@@ -62,7 +62,7 @@ jobs:
           DAGA_M365_CERT_PATH: ${{ env.CERT_PATH }}
           DAGA_M365_CERT_PASSWORD: ${{ secrets.DAGA_M365_CERT_PASSWORD }}
         run: |
-          ./run.ps1 -Tags all -SpecPath $env:DAGA_SPEC_PATH -ConnectM365
+          ./run.ps1 -Tags policies,diagnostics,tags -SpecPath $env:DAGA_SPEC_PATH -ContinueOnError
 
       - name: Cleanup cert
         if: ${{ env.HAS_M365_CERT == 'true' }}
