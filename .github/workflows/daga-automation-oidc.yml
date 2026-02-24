@@ -19,6 +19,15 @@ jobs:
       CERT_PATH: /tmp/daga-exo-cert.pfx
       HAS_M365_CERT: ${{ secrets.DAGA_M365_CERT_PFX != '' }}
     steps:
+      - name: Check M365 cert availability
+        id: check_cert
+        run: |
+          if [ -n "${{ secrets.DAGA_M365_CERT_PFX }}" ]; then
+            echo "has_cert=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_cert=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -44,9 +53,11 @@ jobs:
       - name: Materialize Exchange certificate
         if: ${{ env.HAS_M365_CERT == 'true' }}
         shell: pwsh
+        env:
+          CERT_PATH: ${{ runner.temp }}/daga-exo-cert.pfx
         run: |
           $bytes = [Convert]::FromBase64String('${{ secrets.DAGA_M365_CERT_PFX }}')
-          [System.IO.File]::WriteAllBytes('${{ env.CERT_PATH }}', $bytes)
+          [System.IO.File]::WriteAllBytes('$env:CERT_PATH', $bytes)
 
       - name: Install PowerShell modules
         shell: pwsh
@@ -56,13 +67,69 @@ jobs:
           Install-Module Az.Purview -Scope CurrentUser -Force -AllowClobber
           Install-Module ExchangeOnlineManagement -Scope CurrentUser -Force
 
+      - name: Ensure Purview account exists
+        shell: pwsh
+        run: |
+          $spec = Get-Content $env:SPEC_PATH -Raw | ConvertFrom-Json
+          $purviewSubId = if ($spec.purviewSubscriptionId) { $spec.purviewSubscriptionId } else { $spec.subscriptionId }
+          $purviewRg = if ($spec.purviewResourceGroup) { $spec.purviewResourceGroup } else { $spec.resourceGroup }
+          $location = $spec.location
+          
+          Set-AzContext -SubscriptionId $purviewSubId | Out-Null
+          
+          # Register Microsoft.Purview resource provider if needed
+          $provider = Get-AzResourceProvider -ProviderNamespace Microsoft.Purview
+          if ($provider.RegistrationState -ne 'Registered') {
+            Write-Host "Registering Microsoft.Purview resource provider..." -ForegroundColor Yellow
+            Register-AzResourceProvider -ProviderNamespace Microsoft.Purview | Out-Null
+            
+            # Wait for registration to complete
+            $timeout = 300 # 5 minutes
+            $elapsed = 0
+            while ($elapsed -lt $timeout) {
+              $provider = Get-AzResourceProvider -ProviderNamespace Microsoft.Purview
+              if ($provider.RegistrationState -eq 'Registered') {
+                Write-Host "Microsoft.Purview registered successfully" -ForegroundColor Green
+                break
+              }
+              Start-Sleep -Seconds 10
+              $elapsed += 10
+            }
+            if ($provider.RegistrationState -ne 'Registered') {
+              throw "Microsoft.Purview registration timed out"
+            }
+          }
+          
+          # Check if the specified Purview account exists
+          $existing = Get-AzPurviewAccount -Name $spec.purviewAccount -ResourceGroupName $purviewRg -ErrorAction SilentlyContinue
+          
+          if ($existing) {
+            Write-Host "✓ Purview account '$($spec.purviewAccount)' found and accessible" -ForegroundColor Green
+          } else {
+            Write-Error "✗ Purview account '$($spec.purviewAccount)' not found in subscription '$purviewSubId' / resource group '$purviewRg'"
+            Write-Error ""
+            Write-Error "The workflow cannot continue without a Purview account."
+            Write-Error ""
+            Write-Error "To fix this:"
+            Write-Error "1. Find your existing Purview account:"
+            Write-Error "   Get-AzPurviewAccount | Select-Object Name, ResourceGroupName"
+            Write-Error ""
+            Write-Error "2. Update the DAGA_SPEC_JSON secret with the correct values:"
+            Write-Error "   - purviewAccount: <actual-account-name>"
+            Write-Error "   - purviewResourceGroup: <actual-resource-group>"
+            Write-Error ""
+            Write-Error "3. Grant your service principal Reader access to the Purview account"
+            Write-Error ""
+            throw "Purview account not found. Workflow stopped."
+          }
+
       - name: Run DSPM accelerator
         shell: pwsh
         env:
           DAGA_SPEC_PATH: ${{ env.SPEC_PATH }}
           DAGA_M365_APP_ID: ${{ secrets.DAGA_M365_APP_ID }}
           DAGA_M365_ORGANIZATION: ${{ secrets.DAGA_M365_ORGANIZATION }}
-          DAGA_M365_CERT_PATH: ${{ env.CERT_PATH }}
+          DAGA_M365_CERT_PATH: ${{ runner.temp }}/daga-exo-cert.pfx
           DAGA_M365_CERT_PASSWORD: ${{ secrets.DAGA_M365_CERT_PASSWORD }}
         run: |
           ./run.ps1 -Tags policies,diagnostics,tags -SpecPath $env:DAGA_SPEC_PATH -ContinueOnError
@@ -70,7 +137,10 @@ jobs:
       - name: Cleanup cert
         if: ${{ env.HAS_M365_CERT == 'true' }}
         shell: pwsh
+        env:
+          CERT_PATH: ${{ runner.temp }}/daga-exo-cert.pfx
         run: |
-          if (Test-Path '${{ env.CERT_PATH }}') {
-            Remove-Item '${{ env.CERT_PATH }}' -Force
+          if (Test-Path '$env:CERT_PATH') {
+            Remove-Item '$env:CERT_PATH' -Force
           }
+
