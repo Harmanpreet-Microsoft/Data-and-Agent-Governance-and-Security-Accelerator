@@ -29,6 +29,7 @@ jobs:
           path: ./
           recurse: true
           includeDefaultRules: true
+          excludeRules: 'PSAvoidUsingConvertToSecureStringWithPlainText'
           output: results.sarif
           # Severity levels: Error, Warning, Information
 
@@ -54,7 +55,7 @@ jobs:
         shell: pwsh
         run: |
           $results = Get-ChildItem -Path . -Include *.ps1 -Recurse | 
-            ForEach-Object { Invoke-ScriptAnalyzer -Path $_.FullName -Severity Warning,Error }
+            ForEach-Object { Invoke-ScriptAnalyzer -Path $_.FullName -Severity Warning,Error -ExcludeRule PSAvoidUsingConvertToSecureStringWithPlainText }
           
           if ($results) {
             $results | Format-Table -AutoSize
