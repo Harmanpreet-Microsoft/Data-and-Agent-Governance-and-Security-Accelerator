@@ -2,6 +2,9 @@ name: DSPM Automation (OIDC)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
   id-token: write
@@ -10,8 +13,11 @@ permissions:
 jobs:
   run-automation:
     runs-on: ubuntu-latest
+    environment: production
     env:
       SPEC_PATH: ./spec.ci.json
+      CERT_PATH: /tmp/daga-exo-cert.pfx
+      HAS_M365_CERT: ${{ secrets.DAGA_M365_CERT_PFX != '' }}
     steps:
       - name: Check M365 cert availability
         id: check_cert
@@ -28,9 +34,9 @@ jobs:
       - name: Azure login (federated)
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_FEDERATED_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_FEDERATED_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_FEDERATED_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           enable-AzPSSession: true
 
       - name: Write DSPM spec from secret
@@ -45,7 +51,7 @@ jobs:
           $spec | Out-File -FilePath $env:SPEC_PATH -Encoding utf8
 
       - name: Materialize Exchange certificate
-        if: steps.check_cert.outputs.has_cert == 'true'
+        if: ${{ env.HAS_M365_CERT == 'true' }}
         shell: pwsh
         env:
           CERT_PATH: ${{ runner.temp }}/daga-exo-cert.pfx
@@ -126,15 +132,10 @@ jobs:
           DAGA_M365_CERT_PATH: ${{ runner.temp }}/daga-exo-cert.pfx
           DAGA_M365_CERT_PASSWORD: ${{ secrets.DAGA_M365_CERT_PASSWORD }}
         run: |
-          # Run automation - will fail fast if Purview validation failed above
-          $m365Flag = if ('${{ steps.check_cert.outputs.has_cert }}' -eq 'true') { '-ConnectM365' } else { '' }
-          $command = "./run.ps1 -Tags foundation,dspm,defender,foundry -SpecPath `$env:DAGA_SPEC_PATH $m365Flag"
-          Write-Host "Running: $command" -ForegroundColor Cyan
-          Invoke-Expression $command
-        timeout-minutes: 30
+          ./run.ps1 -Tags policies,diagnostics,tags -SpecPath $env:DAGA_SPEC_PATH -ContinueOnError
 
       - name: Cleanup cert
-        if: steps.check_cert.outputs.has_cert == 'true'
+        if: ${{ env.HAS_M365_CERT == 'true' }}
         shell: pwsh
         env:
           CERT_PATH: ${{ runner.temp }}/daga-exo-cert.pfx
