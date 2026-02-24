@@ -31,7 +31,6 @@ jobs:
           includeDefaultRules: true
           output: results.sarif
           # Severity levels: Error, Warning, Information
-          excludeRule: PSAvoidUsingWriteHost
 
       - name: Upload SARIF results
         uses: github/codeql-action/upload-sarif@v3
