@@ -270,6 +270,9 @@ Install-Module Az.Accounts -Scope CurrentUser -Repository PSGallery -Force
 
 # Installs the Azure Purview module for managing Microsoft Purview resources and data governance
 Install-Module Az.Purview -Scope CurrentUser -Repository PSGallery -Force
+
+# Installs the Azure Security module for managing Microsoft Defender for Cloud and security policies
+Install-Module Az.Security -Scope CurrentUser -Repository PSGallery -Force
 ```
 
 These modules enable the PowerShell automation scripts to interact with Azure services. The `-Scope CurrentUser` parameter installs the modules for your user profile only, without requiring administrator privileges.
