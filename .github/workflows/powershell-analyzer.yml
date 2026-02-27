@@ -6,7 +6,7 @@ on:
     paths:
       - '**/*.ps1'
   pull_request:
-    branches: [ "main", "dev"]
+    branches: [ "main", "dev" ]
     paths:
       - '**/*.ps1'
   workflow_dispatch:
