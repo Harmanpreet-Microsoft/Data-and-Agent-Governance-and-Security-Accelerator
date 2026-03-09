@@ -89,7 +89,11 @@ function Initialize-AutomationEnvironment {
     }
   }
 
-  Import-Module Az.Accounts -ErrorAction Stop | Out-Null
+  # Az.Accounts may already be loaded; installing other Az.* modules can cause
+  # assembly-version conflicts when re-importing in the same session.
+  if (-not (Get-Module -Name Az.Accounts)) {
+    Import-Module Az.Accounts -ErrorAction Stop | Out-Null
+  }
 }
 
 Initialize-AutomationEnvironment -RequireExchange:$ConnectM365
