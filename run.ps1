@@ -68,6 +68,17 @@ function Initialize-AutomationEnvironment {
     $moduleSpecs += @{ Name = "ExchangeOnlineManagement"; MinimumVersion = $null }
   }
 
+  # Pre-import already-available modules to lock assembly versions in the
+  # current session BEFORE installing new modules that may pull different
+  # assembly versions as dependencies (prevents "Assembly with same name"
+  # conflicts from Install-Module side-effects).
+  foreach ($module in $moduleSpecs) {
+    if (-not (Get-Module -Name $module.Name) -and
+        (Get-Module -ListAvailable -Name $module.Name -ErrorAction SilentlyContinue)) {
+      Import-Module $module.Name -ErrorAction SilentlyContinue
+    }
+  }
+
   foreach ($module in $moduleSpecs) {
     $installed = Get-Module -ListAvailable -Name $module.Name -ErrorAction SilentlyContinue | Sort-Object Version -Descending | Select-Object -First 1
     $needsInstall = -not $installed
@@ -89,10 +100,13 @@ function Initialize-AutomationEnvironment {
     }
   }
 
-  # Az.Accounts may already be loaded; installing other Az.* modules can cause
-  # assembly-version conflicts when re-importing in the same session.
-  if (-not (Get-Module -Name Az.Accounts)) {
-    Import-Module Az.Accounts -ErrorAction Stop | Out-Null
+  # Import any newly installed modules; suppress assembly-version conflicts
+  # that occur when a new Az.* module ships with different dependency versions
+  # than what was already loaded above.
+  foreach ($module in $moduleSpecs) {
+    if (-not (Get-Module -Name $module.Name)) {
+      try { Import-Module $module.Name -ErrorAction SilentlyContinue } catch { }
+    }
   }
 }
 
