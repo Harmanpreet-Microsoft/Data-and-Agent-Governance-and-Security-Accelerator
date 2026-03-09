@@ -26,6 +26,17 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Pre-install PowerShell modules
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          $modules = @('Az.Purview','Az.Security','Az.Storage','Az.KeyVault')
+          foreach ($m in $modules) {
+            if (-not (Get-Module -ListAvailable -Name $m -ErrorAction SilentlyContinue)) {
+              Install-Module -Name $m -Scope CurrentUser -Force -AllowClobber -AcceptLicense -Confirm:$false
+            }
+          }
+
       - uses: microsoft/template-validation-action@Latest
         id: validation
         with:
