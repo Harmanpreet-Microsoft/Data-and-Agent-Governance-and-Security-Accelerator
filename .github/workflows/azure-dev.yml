@@ -1,4 +1,4 @@
-name: Azure Template Validation
+name: Template Validation
 
 on:
   workflow_dispatch:
@@ -18,6 +18,13 @@ jobs:
     environment: azd-template-gallery
     steps:
       - uses: actions/checkout@v4
+
+      - name: Azure CLI Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - uses: microsoft/template-validation-action@Latest
         id: validation
