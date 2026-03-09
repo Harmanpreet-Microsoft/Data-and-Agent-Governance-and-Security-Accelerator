@@ -37,7 +37,9 @@ if (Test-Path -Path $specPath) {
 $azContext = Get-AzCliContext
 $tenantId = Get-Default -value $env:AZURE_TENANT_ID -fallback (Get-Default -value ($azContext.tenantId) -fallback "")
 $subscriptionId = Get-Default -value $env:AZURE_SUBSCRIPTION_ID -fallback (Get-Default -value ($azContext.id) -fallback "")
-$resourceGroup = Get-Default -value $env:AZURE_RESOURCE_GROUP -fallback (Get-Default -value $env:AZURE_RESOURCE_GROUP_NAME -fallback "")
+$envName = Get-Default -value $env:AZURE_ENV_NAME -fallback ""
+$rgFallback = if ($envName) { "rg-$envName" } else { "" }
+$resourceGroup = Get-Default -value $env:AZURE_RESOURCE_GROUP -fallback (Get-Default -value $env:AZURE_RESOURCE_GROUP_NAME -fallback $rgFallback)
 $location = Get-Default -value $env:AZURE_LOCATION -fallback ""
 
 $spec = [ordered]@{
